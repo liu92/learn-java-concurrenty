@@ -28,6 +28,7 @@ public class ThreadGroupApi {
                 }
             }
         };
+//        tg1.setDaemon(true);
         t1.start();
 
 
