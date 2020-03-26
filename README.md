@@ -3413,3 +3413,315 @@ public class SimpleThreadPool2 {
 }
 
 ```
+14、design 单例模式
+```java
+package com.learn.concurrenty.design.chapter1;
+
+/**
+ *使用静态内部类的方式
+ * @ClassName: SingletonObject
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/25 17:18
+ * History:
+ * @<version> 1.0
+ */
+public class SingletonObject {
+    /**
+     * 私有化构造器，不给外部使用
+     */
+    private SingletonObject(){}
+
+    /**
+     * 静态内部类
+     */
+    private static class InstanceHolder{
+        //这对像是类对象，所以只在jvm中只有一个
+        private static final SingletonObject instance = new SingletonObject();
+    }
+
+    /**
+     * 在调用整方法的时候，去初始化一个对象
+     * @return
+     */
+    public static SingletonObject getInstance(){
+        return InstanceHolder.instance;
+    }
+}
+
+```
+14.1 使用枚举方式实现单例
+```java
+package com.learn.concurrenty.design.chapter1;
+
+import java.util.stream.IntStream;
+
+/**
+ *使用枚举的方式
+ * @ClassName: SingletonObject
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/25 17:18
+ * History:
+ * @<version> 1.0
+ */
+public class SingletonObject2 {
+    private SingletonObject2(){}
+
+    public enum Singleton{
+
+        /**
+         *
+         */
+        INSTANCE;
+
+        private final  SingletonObject2 instance;
+
+        /**
+         * 私有的构造器，在定义枚举的时候，这个构造函数已经创建了
+         * 只会创建一个对象实例
+         */
+        Singleton(){
+            instance = new SingletonObject2();
+        }
+
+        /**
+         * 获取，然后初始化
+         * @return
+         */
+        public SingletonObject2 getInstance(){
+            return instance;
+        }
+    }
+
+    /**
+     * 通过枚举的方式，去初始化对象
+     * @return
+     */
+    public static SingletonObject2 getInstance(){
+        return Singleton.INSTANCE.getInstance();
+    }
+
+    public static void main(String[] args) {
+        IntStream.rangeClosed(0,40).forEach(i -> new Thread(String.valueOf(i)){
+            @Override
+            public void run() {
+                System.out.println(SingletonObject2.getInstance());
+            }
+        }.start());
+    }
+}
+
+```
+15、多线程的休息室wait set 
+```java
+package com.learn.concurrenty.design.chapter2;
+
+import java.util.Optional;
+import java.util.stream.IntStream;
+
+/**
+ * 多线程的休息室WaitSet
+ * @ClassName: WaitSet
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/25 22:40
+ * History:
+ * @<version> 1.0
+ */
+public class WaitSet {
+
+    private static  final Object LOCK = new Object();
+
+
+    /**
+     *  wait set 在jvm中明确的规定
+     * 1.所有的对象都会有一个wait set,用来存放调用了该对象wait方法之后进入block状态线程
+     * 2.线程被notify之后，不一定立即得到执行
+     * 3.线程从 wait set中被唤醒顺序不一定是 FIFO.
+     * @param args
+     */
+    public static void main(String[] args) {
+        IntStream.rangeClosed(1, 10).forEach(i ->
+                new Thread(String.valueOf(i)){
+                    @Override
+                    public void run() {
+                        synchronized (LOCK){
+
+                            try {
+                                Optional.of(Thread.currentThread().getName() + " will come to wait set.").ifPresent(System.out::println);
+                                LOCK.wait();
+                                Optional.of(Thread.currentThread().getName() + " will leave to wait set.").ifPresent(System.out::println);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }.start()
+        );
+
+
+        IntStream.rangeClosed(1, 10).forEach(i ->{
+            synchronized (LOCK){
+                LOCK.notify();
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}
+
+```
+15.1 测试在在wait 后唤醒，会倒回去执行吗？
+```java
+package com.learn.concurrenty.design.chapter2;
+
+import java.util.Optional;
+import java.util.stream.IntStream;
+
+/**
+ * 多线程的休息室WaitSet
+ * @ClassName: WaitSet
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/25 22:40
+ * History:
+ * @<version> 1.0
+ */
+public class WaitSet2 {
+
+    private static  final Object LOCK = new Object();
+
+    /**
+     * 这里有个疑问就，在将这个线程 唤醒后，
+     * 下面这个方法中 会不会去执行第一个打印语句？
+     * 因为在这个synchronized同步 块中，当线程wait后被唤醒。这里的执行时怎么样的？
+     *
+     * 从执行的结果来看，这个会打印，但是这个 线程被唤醒之后 程序不会倒着执行，
+     * 因为这个wait时候会记录一个输出地址，当被唤醒的时候 从这个记录的地址进行恢复
+     *
+     *
+     */
+    private  static  void  work(){
+        synchronized (LOCK){
+            System.out.println("begin...................");
+            try {
+                System.out.println("Thread will coming");
+                // wait完之后 唤醒 ，必须要去抢锁，但是这个代码执行时有记录的
+                // wait 输出的地址，还有本身执行的地址 会被记录下来，下次执行的时候 进行地址恢复
+                // 然后继续往下走
+                LOCK.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println("Thread will out");
+        }
+
+        //打印结果
+//        begin...................
+//        Thread will coming
+//        Thread will out
+
+    }
+
+    /**
+     *  wait set 在jvm中明确的规定
+     * 1.所有的对象都会有一个wait set,用来存放调用了该对象wait方法之后进入block状态线程
+     * 2.线程被notify之后，不一定立即得到执行
+     * 3.线程从 wait set中被唤醒顺序不一定是 FIFO.
+     * 4.线程被唤醒后，必须重新获取锁
+     * @param args
+     */
+    public static void main(String[] args) throws InterruptedException {
+        new Thread(()->{
+            work();
+        }).start();
+
+        Thread.sleep(1000);
+        synchronized (LOCK){
+            LOCK.notify();
+        }
+  }
+}
+
+```
+16、volatile 的使用, volatile 关键字的可见性
+```java
+package com.learn.concurrenty.design.chapter3;
+
+/**volatile 的使用, volatile 关键字的可见性
+ * 如果不是volatile关键字来修饰这变量，那么其他线程不能感知这个共享变量的变更
+ * @ClassName: VolatileTest
+ * @Description: volatile 的使用
+ * @Author: lin
+ * @Date: 2020/3/26 9:01
+ * History:
+ * @<version> 1.0
+ */
+public class VolatileTest {
+    private volatile static int INIT_VALUE = 0;
+
+    private static  final int MAX_LIMIT = 5;
+
+    public static void main(String[] args) {
+        new Thread(()->{
+            int localValue = INIT_VALUE;
+            while (localValue < MAX_LIMIT){
+                if(localValue != INIT_VALUE) {
+                    System.out.printf("The value updated to [%d]\n", INIT_VALUE);
+                    localValue = INIT_VALUE;
+                }
+            }
+        },"READER").start();
+
+
+        new Thread(() ->{
+            int localValue = INIT_VALUE;
+            while (INIT_VALUE < MAX_LIMIT){
+                System.out.printf(" updated the value to [%d]\n", ++localValue);
+                INIT_VALUE = localValue;
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, "UPDATER").start();
+    }
+}
+
+```
+16、1 cpu架构和  高速缓存一致性协议
+```
+解决缓存不一致的方法
+1、给数据总线加锁 
+        总线(数据总线，地址总线，控制总线)
+2、CPU高速缓存一致性协议
+      Inter提出 MESI
+核心思想
+1、当cpu写入数据的时候，如果发现该变量被共享(也就是锁，在其他cpu中存在该变量的副本)
+会发出一个信号，通知其他cup变量的缓存无效
+2、当其他cpu访问该变量时候，重新到主内存进行获取
+```
+16.2  原子性、可见性、有序性
+```
+1、原子性：对基本数据类型的变量读取和赋值是保证原子性的，要么成功，要么失败，这个操作不可中断
+2、可见性：对共享变量的更新 对其它线程可见
+3、有序性： 重排序只要求最终一致性
+    happens-before relationship
+3.1 代码的执行顺序，编写在前面的发生在编写后面的（只是在单线程情况下）
+3.2 unlock必须发生在lock之后
+3.3 volatile 修饰的变量，对一个变量的写操作先于对该变量的读操作
+3.4 传递规则 ，操作A先于B，B先于C,那么A肯定先于C
+3.5 线程启动规则，start 方法 先于线程run
+3.6 线程中断规则，interrupt 这个动作，必须发生在捕获动作之前（也就是线程中断才能捕获，不能说是捕获了才去中断）
+3.7 对象销毁规则，一个对象的初始化 必须发生在finalize 之前
+3.8 线程终结规则，所以的操作必须发生在线程死亡之前
+
+
+```
+
+    
