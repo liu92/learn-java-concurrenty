@@ -1,7 +1,7 @@
 package com.learn.concurrenty.design.chapter3;
 
 /**
- *在不 VolatileTest2
+ * VolatileTest2
  *
  * volatile 的使用, volatile 关键字的可见性
  * 如果不是volatile关键字来修饰这变量，那么其他线程不能感知这个共享变量的变更

@@ -3694,7 +3694,74 @@ public class VolatileTest {
 }
 
 ```
-16、1 cpu架构和  高速缓存一致性协议
+16.1
+```java
+package com.learn.concurrenty.design.chapter3;
+
+/**
+ * VolatileTest2
+ *
+ * volatile 的使用, volatile 关键字的可见性
+ * 如果不是volatile关键字来修饰这变量，那么其他线程不能感知这个共享变量的变更
+ * @ClassName: VolatileTest
+ * @Description: volatile 的使用
+ * @Author: lin
+ * @Date: 2020/3/26 9:01
+ * History:
+ * @<version> 1.0
+ */
+public class VolatileTest2 {
+    /**
+     * INIT_VALUE 变量都不加上 volatile 修饰都会造成缓存 不一致情况
+     *
+     * 当加上 volatile 关键字后 使其睡眠时间更短 一下那么就会出现 相同的数字
+     * 这样 就没有保障原子性
+     */
+    private  static int INIT_VALUE = 0;
+
+    private static  final int MAX_LIMIT = 5;
+
+    /**
+     * 比如当  INIT_VALUE =10 时
+     * 下面代码 的 //  ++INIT_VALUE
+     * 分为在jvm分为几个步骤
+     * 1.从主内存中个读取INIT_VALUE ->10
+     * 2. 将这个值加1 INIT_VALUE = 10 + 1（注意这里已经从主内存中读取出来了，所以不是INIT_VALUE = INIT_VALUE + 1 这样了）
+     * 3. 然后将值赋值给INIT_VALUE =11
+     * @param args
+     */
+    public static void main(String[] args) {
+        new Thread(()->{
+            while (INIT_VALUE < MAX_LIMIT){
+                //而这里 ，这两个线程都会有对 INIT_VALUE 写的操作
+                // 所以会去更新主内存
+                //  ++INIT_VALUE
+                System.out.println("T1->" +(++INIT_VALUE));
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        },"ADDER-1").start();
+
+
+        new Thread(() ->{
+            while (INIT_VALUE < MAX_LIMIT){
+                try {
+                    System.out.println("T2->" +(++INIT_VALUE));
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, "ADDER-2").start();
+    }
+}
+
+```
+
+16.2 cpu架构和  高速缓存一致性协议
 ```
 解决缓存不一致的方法
 1、给数据总线加锁 
@@ -3706,7 +3773,7 @@ public class VolatileTest {
 会发出一个信号，通知其他cup变量的缓存无效
 2、当其他cpu访问该变量时候，重新到主内存进行获取
 ```
-16.2  原子性、可见性、有序性
+16.3  原子性、可见性、有序性
 ```
 1、原子性：对基本数据类型的变量读取和赋值是保证原子性的，要么成功，要么失败，这个操作不可中断
 2、可见性：对共享变量的更新 对其它线程可见
@@ -3721,7 +3788,1235 @@ public class VolatileTest {
 3.7 对象销毁规则，一个对象的初始化 必须发生在finalize 之前
 3.8 线程终结规则，所以的操作必须发生在线程死亡之前
 
+```
+17、观察者模式
+```java
+package com.learn.concurrenty.design.chapter4;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 在主题发生变化后 去通知所有的观察者
+ * @ClassName: Subject
+ * @Description: 观察者模式-主题
+ * @Author: lin
+ * @Date: 2020/3/26 15:09
+ * History:
+ * @<version> 1.0
+ */
+public class Subject {
+
+    private List<AbstractObserver> observers = new ArrayList<>();
+
+    private int state;
+
+
+    /**
+     * 状态变更
+     * @param state
+     */
+    public void setState(int state){
+        if(state == this.state){
+            return;
+        }
+        this.state = state;
+        //然后去通知 server
+        notifyAllObserver();
+    }
+
+    public int getState(){
+       return this.state ;
+    }
+
+    /**
+     * 连接到每一个server
+     */
+    public void attach(AbstractObserver abstractObserver){
+        observers.add(abstractObserver);
+    }
+
+    /**
+     * 去通知所有的observer
+     */
+    private void notifyAllObserver(){
+        //去更新
+        observers.stream().forEach(AbstractObserver::update);
+    }
+}
 
 ```
+17.1、观察者
+```java
+package com.learn.concurrenty.design.chapter4;
 
-    
+/**
+ * 抽象类 ，这个观察者 里面 定义一些方法
+ * 但是这些方法不去实现，让其子类实现
+ * @ClassName: AbstractObserver
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/26 15:12
+ * @History:
+ * @<version> 1.0
+ */
+public abstract class AbstractObserver {
+
+
+    /**
+     * 组合, 这个让其子类可以访问
+     */
+    protected Subject subject;
+
+    /**
+     * 更新
+     */
+    public abstract void update();
+
+    public AbstractObserver(Subject subject){
+        this.subject = subject;
+        //将observer加入到这个 集合中去，那么就不用到子类中每个都写一边
+        this.subject.attach(this);
+    }
+}
+
+```
+17.2、测试
+```java
+package com.learn.concurrenty.design.chapter4;
+
+/**
+ * @ClassName: ObserverClient
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/26 15:36
+ * History:
+ * @<version> 1.0
+ */
+public class ObserverClient {
+    public static void main(String[] args) {
+        final  Subject  subject = new Subject();
+        AbstractObserver observer = new BinaryObserver(subject);
+        AbstractObserver observer1 = new OctalObserver(subject);
+        System.out.println("======================");
+        subject.setState(10);
+        System.out.println("======================");
+        subject.setState(10);
+        System.out.println("======================");
+        subject.setState(12);
+    }
+}
+
+```
+17.3 将其观察者继承 抽象类
+```java
+package com.learn.concurrenty.design.chapter4;
+
+/**
+ * @ClassName: BinaryObserver
+ * @Description: 二进制 server
+ * @Author: lin
+ * @Date: 2020/3/26 15:24
+ * History:
+ * @<version> 1.0
+ */
+public class BinaryObserver extends AbstractObserver {
+
+    /**
+     * 构造方法，这里需要 主题
+     * @param subject
+     */
+    public  BinaryObserver(Subject subject){
+        super(subject);
+    }
+    //如果在父类不加入 到attach 那么就需要用下面的方式
+//    public  BinaryObserver(Subject subject){
+//        this.subject = subject;
+//    }
+
+    @Override
+    public void update() {
+        System.out.println("Binary String:" + Integer.toBinaryString(subject.getState()));
+    }
+}
+
+```
+17.4 不同的观察者
+```java
+package com.learn.concurrenty.design.chapter4;
+
+/**
+ * @ClassName: OctalObserver
+ * @Description: 八进制 server
+ * @Author: lin
+ * @Date: 2020/3/26 15:24
+ * History:
+ * @<version> 1.0
+ */
+public class OctalObserver extends AbstractObserver {
+
+    /**
+     * 构造方法，这里需要 主题
+     * @param subject
+     */
+    public OctalObserver(Subject subject){
+        super(subject);
+    }
+
+
+    @Override
+    public void update() {
+        System.out.println("Octal String:" + Integer.toOctalString(subject.getState()));
+    }
+}
+
+```
+17.5 监听
+```java
+package com.learn.concurrenty.design.chapter4;
+
+/**
+ * @ClassName: LifeCyleListener
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/26 16:05
+ * History:
+ * @<version> 1.0
+ */
+public interface LifeCycleListener {
+
+    void onEvent(AbstractObserverRunnable.RunnableEvent event);
+}
+
+```
+17.6
+```java
+package com.learn.concurrenty.design.chapter4;
+
+import java.util.List;
+
+/**
+ * @ClassName: ThreadLifeCycleObserver
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/26 16:17
+ * History:
+ * @<version> 1.0
+ */
+public class ThreadLifeCycleObserver implements  LifeCycleListener {
+
+    private final Object LOCK = new Object();
+
+    /**
+     * 批量查询
+     * @param ids
+     */
+    public void concurrentQuery(List<String> ids){
+        if(ids == null || ids.isEmpty()){
+            return;
+        }
+        ids.stream().forEach(id -> new Thread(new AbstractObserverRunnable(this) {
+            @Override
+            public void run() {
+                try {
+                    notifyChange(new RunnableEvent(RunnableState.RUNNING,
+                            Thread.currentThread(), null));
+                    System.out.println("query for the id " + id);
+                    Thread.sleep(1000L);
+                    notifyChange(new RunnableEvent(RunnableState.DONE,
+                            Thread.currentThread(), null));
+                } catch (InterruptedException e) {
+                    notifyChange(new RunnableEvent(RunnableState.ERROR,
+                            Thread.currentThread(), null));
+                }
+            }
+            //id相当于线程的名字了
+         },id).start());
+    }
+
+    /**
+     * 事件回调
+     * @param event
+     */
+    @Override
+    public void onEvent(AbstractObserverRunnable.RunnableEvent event) {
+         synchronized (LOCK){
+             System.out.println("The runnable [" + event.getThread().getName() +"] data changed and state is" );
+             if(event.getCause() !=null){
+                 System.out.println("The runnable ["+ event.getThread().getName() +"] process failed");
+                 event.getCause().printStackTrace();
+             }
+         }
+    }
+}
+
+```
+17.7测试
+```java
+package com.learn.concurrenty.design.chapter4;
+
+import java.util.Arrays;
+
+/**
+ * @ClassName: ThreadLifeCycleClient
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/26 16:52
+ * History:
+ * @<version> 1.0
+ */
+public class ThreadLifeCycleClient {
+    public static void main(String[] args) {
+        new ThreadLifeCycleObserver().concurrentQuery(Arrays.asList("1","2"));
+    }
+}
+
+```
+18.单线程执行设计模式
+```java
+package com.learn.concurrenty.design.chapter5;
+
+/**
+ * 单线程执行设计模式
+ * @ClassName: Gate
+ * @Description: 共享资源
+ * @Author: lin
+ * @Date: 2020/3/26 17:01
+ * History:
+ * @<version> 1.0
+ */
+public class Gate {
+  private int counter =0;
+  private String name = "hhh";
+  private String address = "NowHere";
+
+    /**
+     * 一次只能一个人通过这个门
+     * 这里加 synchronized 是让这个方法一次只有一个人通过
+     * @param name
+     * @param address
+     */
+  public synchronized void pass(String name, String address){
+      this.counter++;
+      this.name=name;
+      this.address = address;
+
+  }
+
+  private void verify(){
+      if(this.name.charAt(0)!=this.address.charAt(0)){
+          System.out.println("**************BROKEN***************" + toString());
+      }
+  }
+
+    @Override
+    public String toString() {
+        return "No." +counter+":" +name +"," + address;
+    }
+}
+
+```
+18.1 相当于线程的user
+```java
+package com.learn.concurrenty.design.chapter5;
+
+/**
+ * @ClassName: User
+ * @Description: user就相当一个线程
+ * @Author: lin
+ * @Date: 2020/3/26 17:07
+ * History:
+ * @<version> 1.0
+ */
+public class User extends  Thread{
+
+    private final String myName;
+
+    private final String myAddress;
+
+    private final Gate gate;
+
+    public User(String myName, String myAddress, Gate gate){
+        this.myName = myName;
+        this.myAddress = myAddress;
+        this.gate = gate;
+    }
+
+    @Override
+    public void run() {
+        System.out.println(myName + "  BEGIN");
+        // 线程启动后一直去 通过这门
+        while (true){
+            this.gate.pass(myName, myAddress);
+        }
+    }
+}
+
+```
+18.2 测试
+```java
+package com.learn.concurrenty.design.chapter5;
+
+/**
+ * @ClassName: Client
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/26 17:12
+ * History:
+ * @<version> 1.0
+ */
+public class Client {
+    public static void main(String[] args) {
+        Gate gate = new Gate();
+        User bj = new User("bao", "beijing", gate);
+        User sh = new User("shang", "shanghai", gate);
+        User gz = new User("Guang", "GuangZhou", gate);
+
+        bj.start();
+        sh.start();
+        gz.start();
+    }
+}
+
+```
+19. 读写锁 
+```java
+package com.learn.concurrenty.design.chapter6;
+
+/**
+ * @ClassName: ReadWriteLock
+ * @Description: 读写锁分离设计
+ * @Author: lin
+ * @Date: 2020/3/27 9:53
+ * History:
+ * @<version> 1.0
+ */
+public class ReadWriteLock {
+    /**
+     * 读线程多少个
+     */
+    private int readingReaders = 0;
+    /**
+     * 等待读 的线程 多少个
+     */
+    private int waitingReaders = 0;
+    /**
+     * 写线程 多少个
+     */
+    private int writingWriters = 0;
+    /**
+     * 等待写 的线程 多少个
+     */
+    private int waitingWriters = 0;
+
+    /**
+     * 这里 设置更偏向于 Writer
+     */
+    private boolean preferWriter = true;
+
+    public ReadWriteLock(){
+        this(true);
+    }
+
+    public ReadWriteLock(boolean preferWriter){
+        this.preferWriter = preferWriter;
+    }
+
+    /**
+     * 读 锁
+     */
+    public synchronized  void readLock()throws  InterruptedException{
+        // 等待读的线程++
+        this.waitingReaders++;
+        try {
+            // 判断，如果写线程 大于0， 那么就等待
+            // 在读取的时候 如果更偏向于 writer那么 就是
+            // 添加判断,如个 读的时候 preferWriter =true 并且 等待的 大于0
+            // 那么就进行等待 ，这样在使用的时候就会更公平些，writer些的时候就会和read 一样
+            while (writingWriters > 0 || (preferWriter && waitingWriters > 0)) {
+                this.wait();
+            }
+            // 如果没有，那么读线程就 ++
+            this.readingReaders ++;
+        } finally {
+            // 等待读的线程 减减
+            this.waitingReaders --;
+        }
+    }
+
+    /**
+     * 释放 读 锁
+     */
+    public synchronized  void readUnLock(){
+        //释放锁
+        this.readingReaders--;
+        this.notifyAll();
+    }
+
+    /**
+     *  写 锁
+     */
+    public synchronized void writeLock() throws InterruptedException {
+        // 写等待线程 ++
+       this.waitingWriters ++;
+       try {
+           // 当有读的 或者 写的 大于 零，那么就不能写， 让其等待
+           while (readingReaders > 0 || writingWriters > 0){
+               this.wait();
+           }
+           this.writingWriters++;
+       }finally {
+           // 写等待线程 --
+           this.waitingWriters--;
+       }
+    }
+
+    public synchronized void writeUnLock(){
+        this.writingWriters --;
+        this.notifyAll();
+    }
+}
+
+
+```
+19.1 读工作者
+```java
+package com.learn.concurrenty.design.chapter6;
+
+/**
+ * @ClassName: ReadWorker
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 10:35
+ * History:
+ * @<version> 1.0
+ */
+public class ReadWorker extends Thread {
+    private final  ShareData data;
+
+    public  ReadWorker(ShareData data){
+        this.data = data;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                char[] readBuffer = data.read();
+                System.out.println(Thread.currentThread().getName()
+                        + " reads " + String.valueOf(readBuffer));
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+    }
+}
+
+```
+19.2 写工作者
+```java
+package com.learn.concurrenty.design.chapter6;
+
+import java.util.Random;
+
+/**
+ * 写 工作者
+ * @ClassName: WriteWorker
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 10:34
+ * History:
+ * @<version> 1.0
+ */
+public class WriteWorker  extends  Thread{
+    private static final Random random = new Random(System.currentTimeMillis());
+
+    private final  ShareData data;
+
+    private final  String filter;
+
+    private int index = 0;
+
+    public WriteWorker(ShareData data, String filter){
+        this.data = data;
+        this.filter = filter;
+    }
+
+    @Override
+    public void run() {
+        try {
+            // 这个捕获异常 不能在循环中，因为进行中断后 在循环中下一次还会进行
+            //
+            while (true){
+               //从 filter拿数据，然后将其写入到 buffer中去
+               char c = nextChar();
+               //往 data里面写数据
+               data.write(c);
+               //写完一个让其简单休眠一下
+               Thread.sleep(random.nextInt(1000));
+            }
+        }catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private char nextChar(){
+        char c = filter.charAt(index);
+        index++;
+        if(index >= filter.length()){
+            index = 0;
+        }
+        return  c;
+    }
+}
+
+```
+19.3 共享数据
+```java
+package com.learn.concurrenty.design.chapter6;
+
+/**
+ * @ClassName: ShareData
+ * @Description: 读和写的共享数据
+ * @Author: lin
+ * @Date: 2020/3/27 10:11
+ * History:
+ * @<version> 1.0
+ */
+public class ShareData {
+    /**
+     * 从这个buffer中读数据，
+     * 和往这个buffer中写数据
+     */
+    private final  char[] buffer;
+
+    private final ReadWriteLock lock = new ReadWriteLock();
+
+    public ShareData(int size){
+        // 声明一个char 数组
+         buffer = new char[size];
+        for (int i = 0; i <size ; i++) {
+            this.buffer[i]= '*';
+        }
+    }
+
+    public char[] read() throws  InterruptedException{
+        try {
+            lock.readLock();
+            return this.doRead();
+        }finally {
+            lock.readUnLock();
+        }
+    }
+
+
+    public void write(char c) throws InterruptedException {
+        try {
+            lock.writeLock();
+            this.doWrite(c);
+        }finally {
+            lock.writeUnLock();
+        }
+    }
+
+    /**
+     * 往buffer中写
+     * @param c
+     */
+    private void  doWrite(char c) {
+        for (int i = 0; i <buffer.length ; i++) {
+            buffer[i] = c;
+            slowly(10);
+        }
+    }
+
+    /**
+     * 创建一个副本
+     * @return
+     */
+    private char[] doRead(){
+        // 因为是引用类型，所以重新定义一个，然后将值赋值给它
+        char[] newBuffer = new char[buffer.length];
+        for (int i = 0; i <buffer.length ; i++) {
+            newBuffer[i] =buffer[i];
+        }
+        // 赋值完成后 进行短暂休眠下
+        slowly(50);
+        return  newBuffer;
+    }
+
+    private void slowly(int millis){
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+```
+19.4 测试
+```java
+package com.learn.concurrenty.design.chapter6;
+
+/**
+ * 测试 读 写 锁
+ * 读和写是冲突的，如果读抢到了锁，那么写 就不能写入
+ * ,如果要解决这种问题 那么就在 ReadWriteLock中去修改
+ *
+ * ReadWriteLock design pattern
+ * Reader-Writer design pattern
+ * @ClassName: ReadWritLockClient
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 10:51
+ * History:
+ * @<version> 1.0
+ */
+public class ReadWritLockClient {
+    public static void main(String[] args) {
+        final  ShareData data = new ShareData(10);
+        new ReadWorker(data).start();
+        new ReadWorker(data).start();
+        new ReadWorker(data).start();
+        new ReadWorker(data).start();
+        new ReadWorker(data).start();
+
+        new WriteWorker(data, "qwertyuiopasdfg").start();
+        new WriteWorker(data, "QWERTYUIOPASDFG").start();
+    }
+}
+
+```
+20.不可变对象
+```java
+package com.learn.concurrenty.design.chapter7;
+
+/**
+ * 1.不可变对象一定是线程安全的（这里暂时不说反射）
+ *
+ * 2.可变对象不一定是不安全的
+ *
+ * @ClassName: Person
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 12:28
+ * History:
+ * @<version> 1.0
+ */
+public class Person {
+    private final  String name;
+    private final  String address;
+
+    public Person(String name, String address) {
+        this.name = name;
+        this.address = address;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    @Override
+    public String toString() {
+        return "Person{" +
+                "name='" + name + '\'' +
+                ", address='" + address + '\'' +
+                '}';
+    }
+}
+
+```
+20.1 不可变
+```java
+package com.learn.concurrenty.design.chapter7;
+
+/**
+ * @ClassName: UsePersonThread
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 13:21
+ * History:
+ * @<version> 1.0
+ */
+public class UsePersonThread extends  Thread{
+
+    private Person person;
+
+    public UsePersonThread(Person person){
+        this.person = person;
+    }
+
+    @Override
+    public void run() {
+        for (int i = 0; i < 20 ; i++) {
+            System.out.println(Thread.currentThread().getName() + " print "+
+                    person.toString());
+        }
+    }
+}
+
+```
+20.2 测试
+```java
+package com.learn.concurrenty.design.chapter7;
+
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ImmutableClient
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 13:23
+ * History:
+ * @<version> 1.0
+ */
+public class ImmutableClient {
+    public static void main(String[] args) {
+        //share data
+        Person person = new Person("lin","cd");
+
+        //多个线程访问共享变量，看看有什么问题
+        //
+        IntStream.range(0, 5).forEach(i -> {
+            new UsePersonThread(person).start();
+        });
+
+        //输入的结果，可以看到 这个不可变对象在多线程下，不会改变
+        // 不可变对象 就是你不能改变他的任何状态
+        //xxx
+        //Thread-0 print Person{name='lin', address='cd'}
+        //Thread-3 print Person{name='lin', address='cd'}
+        //Thread-2 print Person{name='lin', address='cd'}
+        //Thread-1 print Person{name='lin', address='cd'}
+        //xxx
+
+    }
+}
+
+```
+21. 多线程异步调用
+先测试 调用阻塞，必须等到其他事情执行完才继续往上执行，这种方式不会，需别人等到
+```java
+package com.learn.concurrenty.design.chapter8;
+
+/**
+ * 多线程Future 设计模式
+ * @ClassName: SyncInvoker
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 14:42
+ * History:
+ * @<version> 1.0
+ */
+public class SyncInvoker {
+    public static void main(String[] args) throws InterruptedException {
+        // 这个 方法的阻塞，导致了下面方法执行的阻塞
+        // 那么有什么方法可以解决这种问题呢？
+        // 有一种 就是在调用的时候 立即返回回来，返回回来的时候在想要结果的时候
+        // 再去拿结果 ，就是异步的方式去拿取
+        String result = get();
+        System.out.println(result);
+    }
+
+    /**
+     * 比较耗时的操作
+     * @return
+     * @throws InterruptedException
+     */
+    private static  String get() throws InterruptedException {
+        Thread.sleep(100001);
+        return  "FINISH";
+    }
+}
+```
+21.1 异步
+```java
+package com.learn.concurrenty.design.chapter8;
+
+/**
+ * 异步的方法拿取结果, 返回任意类型的结果
+ * @ClassName: Future
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 14:47
+ * History:
+ * @<version> 1.0
+ */
+public interface Future<T>{
+    /**
+     * 通过get 真正得到结果
+     * @return
+     * @throws InterruptedException
+     */
+    T get()throws  InterruptedException;
+}
+
+```
+21.2 异步任务
+```java
+package com.learn.concurrenty.design.chapter8;
+
+/**
+ *
+ * @ClassName: FutureTask
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 14:49
+ * @History:
+ * @<version> 1.0
+ */
+public interface FutureTask<T> {
+    /**
+     * 去做事情
+     * @return
+     */
+    T call();
+}
+
+```
+21.2 中间层，起到桥接
+```java
+package com.learn.concurrenty.design.chapter8;
+
+import java.util.function.Consumer;
+
+/**
+ * 中间层，将Future和 FutureTask 连接起来
+ * @ClassName: FutureService
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 14:52
+ * History:
+ * @<version> 1.0
+ */
+public class FutureService {
+
+    public  <T> Future<T> submit(final  FutureTask<T> task){
+        //异步调用
+        AsyncFuture<T> asyncFuture = new AsyncFuture<>();
+        //在调用get方法时候，怎么知道 我工作已经完成了呢？
+        new Thread(() -> {
+            // 启动线程 这个线程里面去调用call方法
+                T result = task.call();
+                //然后将结果异步通知
+                asyncFuture.done(result);
+        }).start();
+        return  asyncFuture;
+    }
+
+    /**
+     * 比如：当你的蛋糕做完之后, 你不想等,
+     * 那么就给个电话或者地址, 让其送货上门
+     * 这里的consumer就是 地址或者电话
+     * @param task
+     * @param consumer
+     * @param <T>
+     * @return
+     */
+    public  <T> Future<T> submit(final  FutureTask<T> task, Consumer<T> consumer){
+        //异步调用
+        AsyncFuture<T> asyncFuture = new AsyncFuture<>();
+        //在调用get方法时候，怎么知道 我工作已经完成了呢？
+        new Thread(() -> {
+            // 启动线程 这个线程里面去调用call方法
+            T result = task.call();
+            //然后将结果异步通知
+            asyncFuture.done(result);
+            consumer.accept(result);
+        }).start();
+        return  asyncFuture;
+    }
+
+}
+
+
+```
+21.3异步 Future
+```java
+package com.learn.concurrenty.design.chapter8;
+
+/**
+ * @ClassName: AsynFuture
+ * @Description: 异步Future实现
+ * @Author: lin
+ * @Date: 2020/3/27 14:54
+ * History:
+ * @<version> 1.0
+ */
+public class AsyncFuture<T> implements  Future<T> {
+    /**
+     * 判断是否结束
+     */
+    private volatile  boolean done = false;
+
+    private T result;
+
+    public  void done(T result){
+        synchronized (this){
+            this.result = result;
+            this.done = true;
+            this.notifyAll();
+        }
+    }
+
+    @Override
+    public T get() throws InterruptedException {
+        synchronized (this){
+            while (!done){
+                //如果还没有结果 ，那么只能让其wait
+                this.wait();
+            }
+            //如果完成了 那么就返回结果
+        }
+        return result;
+    }
+}
+
+```
+21.4 测试
+```java
+package com.learn.concurrenty.design.chapter8;
+
+/**
+ * Future          -----> 代表的是未来的一个凭据
+ * FutureTask      -----> 将你的逻辑进行了隔离
+ * FutureService   -----> 桥接 Future 和FutureTask
+ *
+ * 异步调用 多线程Future 设计模式
+ * @ClassName: SyncInvoker
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 14:42
+ * History:
+ * @<version> 1.0
+ */
+public class AsyncInvoker {
+    public static void main(String[] args) throws InterruptedException {
+        FutureService futureService = new FutureService();
+        Future<String> submit = futureService.submit(() -> {
+            //模拟 时间比较长
+            try {
+                Thread.sleep(10001);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "FINISH";
+        });
+        //在调用后立即返回，然后最后去获取结果
+        System.out.println("====================");
+        System.out.println("do other thing.");
+        //在做其他事情 也会花费时间
+        Thread.sleep(1000);
+        System.out.println("====================");
+
+        //其他是做完了，这时想 其他的事情
+        // 那么这个时候去获取 其他事情的结果
+        System.out.println("获取结果"+ submit.get());
+
+    }
+
+
+}
+
+```
+22. 线程挂起，等忙完了再去做其他的事情
+```java
+package com.learn.concurrenty.design.chapter9;
+
+/**
+ * @ClassName: Request
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 16:13
+ * History:
+ * @<version> 1.0
+ */
+public class Request {
+    final private String value;
+    public Request(String value){
+        this.value = value;
+    }
+
+    public String getValue(){
+        return  value;
+    }
+}
+
+```  
+22.1 请求队列
+```java
+package com.learn.concurrenty.design.chapter9;
+
+import java.util.LinkedList;
+
+/**
+ * @ClassName: RequestQueue
+ * @Description: 请求队列
+ * @Author: lin
+ * @Date: 2020/3/27 16:13
+ * History:
+ * @<version> 1.0
+ */
+public class RequestQueue {
+   private final LinkedList<Request> queue = new LinkedList<>();
+
+   public  Request getRequest(){
+       synchronized (queue){
+           while (queue.size() <= 0){
+               try {
+                   queue.wait();
+               } catch (InterruptedException e) {
+//                  break;
+                   return  null;
+               }
+           }
+           return  queue.removeFirst();
+       }
+
+   }
+
+    public  void putRequest(Request request){
+        synchronized (queue){
+            queue.addLast(request);
+            queue.notifyAll();
+        }
+    }
+
+}
+
+```
+22.2 客户端线程
+```java
+package com.learn.concurrenty.design.chapter9;
+
+import java.util.Random;
+
+/**
+ * @ClassName: ClientThread
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 16:19
+ * History:
+ * @<version> 1.0
+ */
+public class ClientThread extends Thread {
+    private final RequestQueue queue;
+
+    private final Random random;
+
+    private final  String sendValue;
+
+    public  ClientThread(RequestQueue queue, String sendValue){
+        this.queue = queue;
+        this.sendValue = sendValue;
+        random = new Random(System.currentTimeMillis());
+    }
+
+    @Override
+    public void run() {
+        int t =10;
+        for (int i = 0; i < t; i++) {
+            System.out.println("Client -> request " + sendValue);
+            queue.putRequest(new Request(sendValue));
+            try {
+                Thread.sleep(random.nextInt(1000));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+```
+22.3服务端
+```java
+package com.learn.concurrenty.design.chapter9;
+
+import java.util.Random;
+
+/**
+ * @ClassName: ServerThread
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 16:23
+ * History:
+ * @<version> 1.0
+ */
+public class ServerThread extends  Thread {
+    private final RequestQueue queue;
+
+    private final Random random;
+
+    private volatile  boolean close = false;
+
+    ServerThread(RequestQueue queue){
+        this.queue = queue;
+        random = new Random(System.currentTimeMillis());
+    }
+
+    @Override
+    public void run() {
+        while (!close){
+            //1、当flag = false 时，有可能在getRequest 已经wait住了 ，
+            // 是判断不到这个值的,
+            Request request = queue.getRequest();
+            if(null == request){
+                ///2、sleep的过程中，进行了打断，那么catch中收到了中断信号
+                // 这个时候就退出出去了
+                System.out.println("Received the empty request");
+                continue;
+            }
+            System.out.println("server -> " + request.getValue());
+            try {
+                Thread.sleep(random.nextInt(1000));
+            } catch (InterruptedException e) {
+                return;
+            }
+            // 3、本身在休眠的过程中  然后让其中断
+        }
+    }
+
+    public  void close(){
+        this.close = true;
+        this.interrupt();
+    }
+}
+
+```
+22.4 测试
+```java
+package com.learn.concurrenty.design.chapter9;
+
+/**
+ *  线程挂起
+ * 比如：你在做饭，但是你的快递到了，这个时候没有办法去拿，那么只有叫快递员等待一会儿
+ *
+ * 手上的事情还没有做完，等忙完了再去做其他的事情
+ * @ClassName: SuspensionClient
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 16:40
+ * History:
+ * @<version> 1.0
+ */
+public class SuspensionClient {
+    public static void main(String[] args) throws InterruptedException {
+        final  RequestQueue queue = new RequestQueue();
+        new ClientThread(queue, "Alex").start();
+        ServerThread serverThread = new ServerThread(queue);
+        serverThread.start();
+//        serverThread.join();
+
+        //如果这个地方休眠时间太少，基本上看不到 request参数为空的情况
+        Thread.sleep(10000);
+        serverThread.close();
+    }
+}
+
+```
