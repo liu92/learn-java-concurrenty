@@ -5020,3 +5020,16 @@ public class SuspensionClient {
 }
 
 ```
+18、相关多线程和设计模式
+```
+1. singleton design pattern
+2. WaitSet in synchronzied monitor
+3. Cpu&Cpu cache& Main Memory & Data Bus & Cache Line
+4. The volatile key word in deep
+5. Java Class Loader
+6. Observer to monitor The Thread lifecycle
+7. Single Thread Execution design pattern
+8. Immutable design pattern
+9. Guarded Suspension design pattern
+10.
+```
