@@ -20,7 +20,7 @@ public class DefaultThreadFactory implements ThreadFactory {
     public DefaultThreadFactory(){
         SecurityManager s = System.getSecurityManager();
         group = (s !=null ) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
-        namePrefix = "pool-"+POOL_NUMBER.getAndIncrement()+"-thread";
+        namePrefix = "pool-"+POOL_NUMBER.getAndIncrement()+"-thread-";
     }
 
 
