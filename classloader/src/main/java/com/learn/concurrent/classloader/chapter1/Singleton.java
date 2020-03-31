@@ -9,16 +9,39 @@ package com.learn.concurrent.classloader.chapter1;
  * @<version> 1.0
  */
 public class Singleton {
+    /**
+     * 第二种：就 这个instance 放在x, y静态变量的前面
+     * 它的类加载过程是 ，
+     *  这三点是 默认值
+     * 1. instance = null;
+     * 2. x = 0;
+     * 3. y = 0;
+     *
+     * 下面是为静态变量赋予正确的初始值
+     *  x++=>x=1
+     *  y++=>y=1
+     *  instance = new Singleton();
+     *  当上面初始化，再对 x重新进行了赋值操作
+     *  然后 x 被赋值为 0 ，
+     *  而y 没有赋值 在初始的时候给了默认值，所以就是默认值，
+     *  x = 0;
+     *  y = 1;
+     *
+     *
+     *
+     */
+    private static Singleton instance = new Singleton();
 
     public  static  int x = 0;
 
     public  static  int y ;
 
     /**
-     * 第一种，当new的这个对象变量放在这里是, x 和 y的值
+     * 第一种，就是这个instance放在这里
+     * 当new的这个对象变量放在这里是, x 和 y的值
      * 是 1，1
      */
-    private static Singleton instance = new Singleton();
+//    private static Singleton instance = new Singleton();
     /**
      * 这个要结合类加载的三个阶段类分析:
      *
@@ -30,7 +53,6 @@ public class Singleton {
      *  2. int y = 0;
      *  引用类型 默认值
      *  3. instance = null;
-     *
      */
 
     private Singleton(){
