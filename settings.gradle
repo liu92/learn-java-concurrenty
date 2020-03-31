@@ -1,2 +1,4 @@
 rootProject.name = 'learn-java-concurrenty'
+include 'design_pattern'
+include 'classloader'
 

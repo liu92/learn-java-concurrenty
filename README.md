@@ -3415,7 +3415,7 @@ public class SimpleThreadPool2 {
 ```
 14、design 单例模式
 ```java
-package com.learn.concurrenty.design.chapter1;
+package com.learn.concurrent.design.design.design.chapter1;
 
 /**
  *使用静态内部类的方式
@@ -3452,7 +3452,7 @@ public class SingletonObject {
 ```
 14.1 使用枚举方式实现单例
 ```java
-package com.learn.concurrenty.design.chapter1;
+package com.learn.concurrent.design.design.design.chapter1;
 
 import java.util.stream.IntStream;
 
@@ -3515,7 +3515,7 @@ public class SingletonObject2 {
 ```
 15、多线程的休息室wait set 
 ```java
-package com.learn.concurrenty.design.chapter2;
+package com.learn.concurrent.design.design.design.chapter2;
 
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -3577,10 +3577,7 @@ public class WaitSet {
 ```
 15.1 测试在在wait 后唤醒，会倒回去执行吗？
 ```java
-package com.learn.concurrenty.design.chapter2;
-
-import java.util.Optional;
-import java.util.stream.IntStream;
+package com.learn.concurrent.design.design.design.chapter2;
 
 /**
  * 多线程的休息室WaitSet
@@ -3650,7 +3647,7 @@ public class WaitSet2 {
 ```
 16、volatile 的使用, volatile 关键字的可见性
 ```java
-package com.learn.concurrenty.design.chapter3;
+package com.learn.concurrent.design.design.design.chapter3;
 
 /**volatile 的使用, volatile 关键字的可见性
  * 如果不是volatile关键字来修饰这变量，那么其他线程不能感知这个共享变量的变更
@@ -3696,7 +3693,7 @@ public class VolatileTest {
 ```
 16.1
 ```java
-package com.learn.concurrenty.design.chapter3;
+package com.learn.concurrent.design.design.design.chapter3;
 
 /**
  * VolatileTest2
@@ -3791,7 +3788,7 @@ public class VolatileTest2 {
 ```
 17、观察者模式
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -3848,7 +3845,7 @@ public class Subject {
 ```
 17.1、观察者
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 /**
  * 抽象类 ，这个观察者 里面 定义一些方法
@@ -3883,7 +3880,7 @@ public abstract class AbstractObserver {
 ```
 17.2、测试
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 /**
  * @ClassName: ObserverClient
@@ -3910,7 +3907,7 @@ public class ObserverClient {
 ```
 17.3 将其观察者继承 抽象类
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 /**
  * @ClassName: BinaryObserver
@@ -3943,7 +3940,7 @@ public class BinaryObserver extends AbstractObserver {
 ```
 17.4 不同的观察者
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 /**
  * @ClassName: OctalObserver
@@ -3973,7 +3970,7 @@ public class OctalObserver extends AbstractObserver {
 ```
 17.5 监听
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 /**
  * @ClassName: LifeCyleListener
@@ -3991,7 +3988,7 @@ public interface LifeCycleListener {
 ```
 17.6
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 import java.util.List;
 
@@ -4053,7 +4050,7 @@ public class ThreadLifeCycleObserver implements  LifeCycleListener {
 ```
 17.7测试
 ```java
-package com.learn.concurrenty.design.chapter4;
+package com.learn.concurrent.design.design.design.chapter4;
 
 import java.util.Arrays;
 
@@ -4074,7 +4071,7 @@ public class ThreadLifeCycleClient {
 ```
 18.单线程执行设计模式
 ```java
-package com.learn.concurrenty.design.chapter5;
+package com.learn.concurrent.design.design.design.chapter5;
 
 /**
  * 单线程执行设计模式
@@ -4118,7 +4115,7 @@ public class Gate {
 ```
 18.1 相当于线程的user
 ```java
-package com.learn.concurrenty.design.chapter5;
+package com.learn.concurrent.design.design.design.chapter5;
 
 /**
  * @ClassName: User
@@ -4155,7 +4152,7 @@ public class User extends  Thread{
 ```
 18.2 测试
 ```java
-package com.learn.concurrenty.design.chapter5;
+package com.learn.concurrent.design.design.design.chapter5;
 
 /**
  * @ClassName: Client
@@ -4181,7 +4178,7 @@ public class Client {
 ```
 19. 读写锁 
 ```java
-package com.learn.concurrenty.design.chapter6;
+package com.learn.concurrent.design.design.design.chapter6;
 
 /**
  * @ClassName: ReadWriteLock
@@ -4281,7 +4278,7 @@ public class ReadWriteLock {
 ```
 19.1 读工作者
 ```java
-package com.learn.concurrenty.design.chapter6;
+package com.learn.concurrent.design.design.design.chapter6;
 
 /**
  * @ClassName: ReadWorker
@@ -4316,7 +4313,7 @@ public class ReadWorker extends Thread {
 ```
 19.2 写工作者
 ```java
-package com.learn.concurrenty.design.chapter6;
+package com.learn.concurrent.design.design.design.chapter6;
 
 import java.util.Random;
 
@@ -4374,7 +4371,7 @@ public class WriteWorker  extends  Thread{
 ```
 19.3 共享数据
 ```java
-package com.learn.concurrenty.design.chapter6;
+package com.learn.concurrent.design.design.design.chapter6;
 
 /**
  * @ClassName: ShareData
@@ -4458,7 +4455,7 @@ public class ShareData {
 ```
 19.4 测试
 ```java
-package com.learn.concurrenty.design.chapter6;
+package com.learn.concurrent.design.design.design.chapter6;
 
 /**
  * 测试 读 写 锁
@@ -4491,7 +4488,7 @@ public class ReadWritLockClient {
 ```
 20.不可变对象
 ```java
-package com.learn.concurrenty.design.chapter7;
+package com.learn.concurrent.design.design.design.chapter7;
 
 /**
  * 1.不可变对象一定是线程安全的（这里暂时不说反射）
@@ -4534,7 +4531,7 @@ public class Person {
 ```
 20.1 不可变
 ```java
-package com.learn.concurrenty.design.chapter7;
+package com.learn.concurrent.design.design.design.chapter7;
 
 /**
  * @ClassName: UsePersonThread
@@ -4564,7 +4561,7 @@ public class UsePersonThread extends  Thread{
 ```
 20.2 测试
 ```java
-package com.learn.concurrenty.design.chapter7;
+package com.learn.concurrent.design.design.design.chapter7;
 
 import java.util.stream.IntStream;
 
@@ -4603,7 +4600,7 @@ public class ImmutableClient {
 21. 多线程异步调用
 先测试 调用阻塞，必须等到其他事情执行完才继续往上执行，这种方式不会，需别人等到
 ```java
-package com.learn.concurrenty.design.chapter8;
+package com.learn.concurrent.design.design.design.chapter8;
 
 /**
  * 多线程Future 设计模式
@@ -4637,7 +4634,7 @@ public class SyncInvoker {
 ```
 21.1 异步
 ```java
-package com.learn.concurrenty.design.chapter8;
+package com.learn.concurrent.design.design.design.chapter8;
 
 /**
  * 异步的方法拿取结果, 返回任意类型的结果
@@ -4660,7 +4657,7 @@ public interface Future<T>{
 ```
 21.2 异步任务
 ```java
-package com.learn.concurrenty.design.chapter8;
+package com.learn.concurrent.design.design.design.chapter8;
 
 /**
  *
@@ -4682,7 +4679,7 @@ public interface FutureTask<T> {
 ```
 21.2 中间层，起到桥接
 ```java
-package com.learn.concurrenty.design.chapter8;
+package com.learn.concurrent.design.design.design.chapter8;
 
 import java.util.function.Consumer;
 
@@ -4739,7 +4736,7 @@ public class FutureService {
 ```
 21.3异步 Future
 ```java
-package com.learn.concurrenty.design.chapter8;
+package com.learn.concurrent.design.design.design.chapter8;
 
 /**
  * @ClassName: AsynFuture
@@ -4781,7 +4778,7 @@ public class AsyncFuture<T> implements  Future<T> {
 ```
 21.4 测试
 ```java
-package com.learn.concurrenty.design.chapter8;
+package com.learn.concurrent.design.design.design.chapter8;
 
 /**
  * Future          -----> 代表的是未来的一个凭据
@@ -4827,7 +4824,7 @@ public class AsyncInvoker {
 ```
 22. 线程挂起，等忙完了再去做其他的事情
 ```java
-package com.learn.concurrenty.design.chapter9;
+package com.learn.concurrent.design.design.design.chapter9;
 
 /**
  * @ClassName: Request
@@ -4851,7 +4848,7 @@ public class Request {
 ```  
 22.1 请求队列
 ```java
-package com.learn.concurrenty.design.chapter9;
+package com.learn.concurrent.design.design.design.chapter9;
 
 import java.util.LinkedList;
 
@@ -4893,7 +4890,7 @@ public class RequestQueue {
 ```
 22.2 客户端线程
 ```java
-package com.learn.concurrenty.design.chapter9;
+package com.learn.concurrent.design.design.design.chapter9;
 
 import java.util.Random;
 
@@ -4936,7 +4933,7 @@ public class ClientThread extends Thread {
 ```
 22.3服务端
 ```java
-package com.learn.concurrenty.design.chapter9;
+package com.learn.concurrent.design.design.design.chapter9;
 
 import java.util.Random;
 
@@ -4991,7 +4988,7 @@ public class ServerThread extends  Thread {
 ```
 22.4 测试
 ```java
-package com.learn.concurrenty.design.chapter9;
+package com.learn.concurrent.design.design.design.chapter9;
 
 /**
  *  线程挂起
@@ -5020,7 +5017,281 @@ public class SuspensionClient {
 }
 
 ```
-18、相关多线程和设计模式
+23. ThreadLocal使用
+```java
+package com.learn.concurrent.design.design.design.chapter10;
+
+import java.util.Random;
+
+/**
+ * ThreadLocal使用
+ * @ClassName: ThreadLocalComplexTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 17:27
+ * History:
+ * @<version> 1.0
+ */
+public class ThreadLocalComplexTest {
+
+    /**
+     * threadLocal
+     */
+    private static  ThreadLocal<String> threadLocal = new ThreadLocal<>();
+
+    /**
+     * 随机因子
+     */
+    private static final Random random = new Random(System.currentTimeMillis());
+
+
+    /**
+     * JVM start main thread
+     * @param args
+     */
+    public static void main(String[] args) throws InterruptedException {
+        Thread t1 = new Thread(() -> {
+            threadLocal.set("Thread-T1");
+            try {
+                Thread.sleep(random.nextInt(100));
+                System.out.println(Thread.currentThread().getName() + " " + threadLocal.get());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+
+        Thread t2 = new Thread(() -> {
+            threadLocal.set("Thread-T2");
+            try {
+                Thread.sleep(random.nextInt(100));
+                System.out.println(Thread.currentThread().getName() + " " + threadLocal.get());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+        System.out.println("===================");
+        System.out.println(Thread.currentThread().getName() + " " + threadLocal.get());
+
+    }
+}
+```
+24.上下文
+```java
+package com.learn.concurrent.design.design.design.chapter11;
+
+/**
+ * @ClassName: Context
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 22:21
+ * History:
+ * @<version> 1.0
+ */
+public class Context {
+
+    private  String name;
+
+    private String cardId;
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setCardId(String cardId) {
+        this.cardId = cardId;
+    }
+
+    public String getCardId() {
+        return cardId;
+    }
+}
+
+```
+24.1 使用ThreadLocal实现一个上下文
+```java
+package com.learn.concurrent.design.design.design.chapter11;
+
+/**
+ * 使用ThreadLocal实现一个上下文,
+ * 通过这个和线程绑定的方式，就不需要传入参数了
+ * @ClassName: ActionContext
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 22:44
+ * History:
+ * @<version> 1.0
+ */
+public class ActionContext {
+
+    private static  final  ThreadLocal<Context> threadLocal = new ThreadLocal<Context>(){
+        @Override
+        protected Context initialValue() {
+            return new Context();
+        }
+    };
+
+
+    private static class  ContextHolder{
+        private final  static ActionContext actionContext = new ActionContext();
+
+    }
+    public  static  ActionContext getActionContext(){
+        return  ContextHolder.actionContext;
+    }
+
+    public Context getContext(){
+       return  threadLocal.get();
+    }
+
+}
+
+```
+24.2 查询db
+```java
+package com.learn.concurrent.design.design.design.chapter11;
+
+/**
+ * @ClassName: QueryFromDbAction
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 22:21
+ * History:
+ * @<version> 1.0
+ */
+public class QueryFromDbAction {
+
+//    public  void  execute(Context context){
+//        try {
+//            Thread.sleep(1000L);
+//            String name = "Alex " + Thread.currentThread().getName();
+//            context.setName(name);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+//    }
+
+    public  void  execute(){
+        try {
+            Thread.sleep(1000L);
+            String name = "Alex " + Thread.currentThread().getName();
+            // 这个就直接去获取上下文，而不是传入进去
+            ActionContext.getActionContext().getContext().setName(name);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+```
+24.3 使用http
+```java
+package com.learn.concurrent.design.design.design.chapter11;
+
+/**
+ * @ClassName: QueryFromHttpAction
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 22:25
+ * History:
+ * @<version> 1.0
+ */
+public class QueryFromHttpAction {
+
+//    public  void  execute(Context context){
+//        String name =  context.getName();
+//        String cardId = getCardId(name);
+//        context.setCardId(cardId);
+//    }
+
+
+    public  void  execute(){
+        // 这里我们没有set 东西进去，因为 在 ActionContext有 初始的东西
+        Context context = ActionContext.getActionContext().getContext();
+        String name =  context.getName();
+        String cardId = getCardId(name);
+        context.setCardId(cardId);
+    }
+
+
+    /**
+     * 通过名字 拿取身份证
+     * @param name
+     * @return
+     */
+    private  String getCardId(String name){
+        try {
+
+            Thread.sleep(1000L);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return  "234354" + Thread.currentThread().getId();
+    }
+}
+
+```
+24.4 多线程上下文切换
+```java
+package com.learn.concurrent.design.design.design.chapter11;
+
+/**
+ * 多线程运行上下文切换
+ * @ClassName: ExecutionTask
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 22:20
+ * History:
+ * @<version> 1.0
+ */
+public class ExecutionTask implements Runnable {
+    private QueryFromDbAction action = new QueryFromDbAction();
+    private QueryFromHttpAction httpAction = new QueryFromHttpAction();
+    /**
+     */
+    @Override
+    public void run() {
+         Context context = ActionContext.getActionContext().getContext();
+       action.execute();
+       System.out.println("The name query successful");
+       httpAction.execute();
+       System.out.println("The card id query successful");
+       System.out.println("The Name is " + context.getName() +" and CardId " + context.getCardId());
+    }
+}
+```
+24.5测试
+```java
+package com.learn.concurrent.design.design.design.chapter11;
+
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ContextTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/27 22:31
+ * History:
+ * @<version> 1.0
+ */
+public class ContextTest {
+    public static void main(String[] args) {
+        IntStream.range(1, 5).forEach(i ->{
+           new Thread(new ExecutionTask()).start();
+        });
+    }
+}
+
+```
+
+28、相关多线程和设计模式
 ```
 1. singleton design pattern
 2. WaitSet in synchronzied monitor
@@ -5031,5 +5302,128 @@ public class SuspensionClient {
 7. Single Thread Execution design pattern
 8. Immutable design pattern
 9. Guarded Suspension design pattern
-10.
+10.Balking design pattern
+11.Producer-Consumer
+12.Read-Write Lock design pattern
+13.Thread-Per-Message Design Patten
+14.Worker Thread Design Pattern
+15.Future Design Pattern
+16.Two-Phase Termination Design Pattern
+17.The Thread-Specific Storage
+18.Active Objects
+19.Count Down Design Pattern
+20.JMM-java Memory Model
+```
+
+30、ClassLoader类加载
+1、类加载的三个阶段
+```
+1.加载:查找并且加载类的二进制数据
+2.链接
+   -验证:确保被加载类的正确性
+   -准备:为类的静态变量分配内存,并将其初始化为默认值
+   -解析:把类中的符号引用转换为直接引用
+3.初始化:为类的静态变量赋予正确的初始值
+```
+2、主动使用
+```
+1. new 直接使用
+2. 访问某个类或者接口的静态变量,或者对该静态变量进行赋值操作
+   a.对某个类的静态变量进行读写  ---->初始化class
+   b.对接口中静态变量进行读取  -------> interface
+3. 调用静态方法
+4. 反射某个类
+5. 初始一个子类
+6. 启动类,比如 java HelloWorld
+除了上面这几种,其余的都是被动引用,不会导致类的初始化
+```
+
+30.1 下面是一个简单的测试
+```java
+package com.learn.concurrent.classloader.chapter1;
+
+import java.util.Random;
+
+/**
+ * @ClassName: ClassActiveUse
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/31 15:51
+ * History:
+ * @<version> 1.0
+ */
+public class ClassActiveUse {
+
+    //6. 启动类初始化类
+    static {
+        System.out.println("==========ClassActiveUse============");
+    }
+
+    public static void main(String[] args) throws ClassNotFoundException {
+       // 主动调用
+       //new Obj();
+       // 1.对接口中静态变量进行读取是也会初始类
+       // System.out.println(Tes.count);
+
+        //2. 在调用类中静态变量也会 先初始类
+        //System.out.println(Obj.SALARY);
+        //3. 调用静态方法 也会初始类
+        //Obj.printSalary();
+
+        //4.反射某个类,也会主动调用一个类 进行初始化
+        //Class.forName("com.learn.concurrent.classloader.chapter1.Obj");
+
+        //5.初始化一个子类,父类会被先初始
+        //System.out.println(Child.at);
+
+
+        // ============================
+        //6.当子类调用父类的静态变量时,子类【不会】初始化
+        //System.out.println(Child.SALARY);
+
+        //7.数组引用是【不会】初始化类的
+        //Obj[] arrays = new Obj[10];
+
+        //8.如果变量是静态不可变的,那么会初始化类吗？
+        // 这种不会初始类, 因为这个静态变量在使用final修饰后,就会有初始值了
+        // 引用常量不会导致 类的一个初始化
+        // 并且这个静态变量 在编译阶段就放到常量池中去了
+        // System.out.println(Obj.CON);
+
+        //9. 并且一个变量是静态不可变修饰的 但是是随机产生 会去初始化类吗?
+        // 这个会去初始化类, 这个是因为在 编译阶段不能计算出值,
+        // 只有在运行时才会去计算出值,所以这个会导致类的初始化
+        System.out.println(Obj.t);
+
+
+    }
+}
+
+class Obj{
+
+    public  static long SALARY = 10000L;
+    public static  final long CON = 88L;
+    public static  final  int t = new Random().nextInt(100);
+
+    static {
+        System.out.println("Obj 被初始化");
+    }
+
+    public static void printSalary(){
+        System.out.println("=========obj=====salary");
+    }
+}
+
+class Child extends Obj{
+    public static int at = 12;
+    static {
+        System.out.println("Child 被初始化");
+    }
+}
+
+interface  Tes{
+    //默认是静态修饰和不可变类型
+    int count =0;
+}
+
 ```
