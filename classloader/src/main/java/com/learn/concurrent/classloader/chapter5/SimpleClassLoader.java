@@ -1,4 +1,6 @@
-package com.learn.concurrent.classloader.chapter3;
+package com.learn.concurrent.classloader.chapter5;
+
+import com.learn.concurrent.classloader.chapter1.LoaderClass;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -15,11 +17,11 @@ import java.io.IOException;
  * History:
  * @<version> 1.0
  */
-public class MyClassLoader extends  ClassLoader{
+public class SimpleClassLoader extends  ClassLoader{
     /**
      * 磁盘定义一个目录
      */
-    private static  final String DEFAULT_DIR = "D:\\app\\classloader";
+    private static  final String DEFAULT_DIR = "D:\\app\\revert";
 
     /**
      * 定义一个dir, 让别人可以传入,如果不传入那么就是默认值
@@ -34,7 +36,7 @@ public class MyClassLoader extends  ClassLoader{
     /**
      * 默认构造函数
      */
-    MyClassLoader(){
+    SimpleClassLoader(){
         super();
     }
 
@@ -42,7 +44,7 @@ public class MyClassLoader extends  ClassLoader{
      * 这个设置 classLoader的名字
      * @param classLoaderName
      */
-    MyClassLoader(String classLoaderName){
+    SimpleClassLoader(String classLoaderName){
         super();
         this.classLoaderName = classLoaderName;
     }
@@ -52,9 +54,48 @@ public class MyClassLoader extends  ClassLoader{
      * @param classLoaderName
      * @param parent
      */
-    public  MyClassLoader(String classLoaderName, ClassLoader parent){
+    public SimpleClassLoader(String classLoaderName, ClassLoader parent){
         super(parent);
         this.classLoaderName = classLoaderName;
+    }
+
+
+    /**
+     * 重写 loadClass 去覆盖父类的方法
+     * @param name
+     * @param resolve
+     * @return
+     * @throws ClassNotFoundException
+     */
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        Class<?> clazz = null;
+        if(name.startsWith("java.")){
+            try {
+                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+                clazz = systemClassLoader.loadClass(name);
+                if(clazz != null){
+                    if (resolve){
+                        //解析
+                        resolveClass(clazz);
+                    }
+                    return  clazz;
+                }
+            }catch (Exception e){
+
+            }
+        }
+        try {
+            clazz = findClass(name);
+        }catch (Exception e){
+
+        }
+
+        if(clazz == null && getParent()!=null){
+            getParent().loadClass(name);
+        }
+
+        return clazz;
     }
 
     /**
@@ -86,6 +127,9 @@ public class MyClassLoader extends  ClassLoader{
         // 从1000~200是B class
         return this.defineClass(name, classBytes, 0, classBytes.length);
     }
+
+
+
 
     /**
      * 将一个文件变成一个数组
