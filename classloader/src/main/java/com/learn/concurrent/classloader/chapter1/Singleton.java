@@ -1,6 +1,7 @@
 package com.learn.concurrent.classloader.chapter1;
 
 /**
+ * 一个例子 来分析 类会不会被加载
  * @ClassName: Singleton
  * @Description:
  * @Author: lin
