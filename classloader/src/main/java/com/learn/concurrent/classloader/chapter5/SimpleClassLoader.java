@@ -70,25 +70,29 @@ public class SimpleClassLoader extends  ClassLoader{
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         Class<?> clazz = null;
-        if(name.startsWith("java.")){
-            try {
-                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-                clazz = systemClassLoader.loadClass(name);
-                if(clazz != null){
-                    if (resolve){
-                        //解析
-                        resolveClass(clazz);
-                    }
-                    return  clazz;
-                }
-            }catch (Exception e){
+        //java 的这部分还是交给 其父加载器 去查找
+        // 这么去将java中 包 进行处理
+//        if(name.startsWith("java.")){
+//            try {
+//                //系统类加载器
+//                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+//                clazz = systemClassLoader.loadClass(name);
+//                if(clazz != null){
+//                    if (resolve){
+//                        //解析
+//                        resolveClass(clazz);
+//                    }
+//                    return  clazz;
+//                }
+//            }catch (Exception e){
+//
+//            }
+//        }
 
-            }
-        }
         try {
             clazz = findClass(name);
         }catch (Exception e){
-
+            e.printStackTrace();
         }
 
         if(clazz == null && getParent()!=null){

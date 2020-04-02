@@ -34,7 +34,7 @@ public class MyClassLoader extends  ClassLoader{
     /**
      * 默认构造函数
      */
-    MyClassLoader(){
+    public MyClassLoader(){
         super();
     }
 

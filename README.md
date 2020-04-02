@@ -5427,6 +5427,714 @@ interface  Tes{
 }
 
 ```
+30.2 测试
+```java
+package com.learn.concurrent.classloader.chapter1;
+
+/**
+ * 一个例子 来分析 类会不会被加载
+ * @ClassName: Singleton
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/3/31 17:13
+ * History:
+ * @<version> 1.0
+ */
+public class Singleton {
+    /**
+     * 第二种：就 这个instance 放在x, y静态变量的前面
+     * 它的类加载过程是 ，
+     *  这三点是 默认值
+     * 1. instance = null;
+     * 2. x = 0;
+     * 3. y = 0;
+     *
+     * 下面是为静态变量赋予正确的初始值
+     *  x++=>x=1
+     *  y++=>y=1
+     *  instance = new Singleton();
+     *  当上面初始化，再对 x重新进行了赋值操作
+     *  然后 x 被赋值为 0 ，
+     *  而y 没有赋值 在初始的时候给了默认值，所以就是默认值，
+     *  x = 0;
+     *  y = 1;
+     *
+     *
+     *
+     */
+    private static Singleton instance = new Singleton();
+
+    public  static  int x = 0;
+
+    public  static  int y ;
+
+    /**
+     * 第一种，就是这个instance放在这里
+     * 当new的这个对象变量放在这里是, x 和 y的值
+     * 是 1，1
+     */
+//    private static Singleton instance = new Singleton();
+    /**
+     * 这个要结合类加载的三个阶段类分析:
+     *
+     *  因为这样执行的步骤是
+     *  int x 先放的是一个地址,开辟一个内存空间, 然后就是给一个默认值 0,
+     *  这个默认值和上面的值不一样, 上面的是我们赋予的, 而这个0是 int的默认值
+     *  1. int x = 0;
+     *  y 也是给默认值
+     *  2. int y = 0;
+     *  引用类型 默认值
+     *  3. instance = null;
+     */
+
+    private Singleton(){
+        x ++;
+        y++;
+    }
+
+    public static  Singleton getInstance(){
+       return instance ;
+    }
+
+    public static void main(String[] args) {
+        Singleton instance = Singleton.getInstance();
+        System.out.println(instance);
+        System.out.println(Singleton.x);
+        System.out.println(Singleton.y);
+    }
+
+}
+
+```
+30.3
+```
+1.方法区 存放了每一个类对象的结构、运行时常量、字段 、方法数据和构造函数代码
+包括用于类和实例初始化以及接口初始化的特殊方法
+而堆里面存放的是类对象的真实数据，这个真实的数据的结构就是存放在堆里
+当我们在访问的时候 通过堆中有个对象类型数据的指针 然后去访问 方法区，
+因为数据有了 但是要组织起来，这个数据的类型是存放在方法区中的 所以 通过 
+对象数据类型指针来指定到 方法区 然后方法区将这个对象的类类型组织起来。
+
+```
+30.4 链接阶段
+```
+.在加载阶段完成后，虚拟机外部的二进制数据量就会按照虚拟机所需要的格式存储在
+方法区中(数据结构)，然后在堆中创建一个class对象，这个对象作为程序访问方法区中
+这些数据结构的外部接口
+.加载阶段与连接阶段的部分内容可以是交叉进行的，比如一部分代码加载完成就可以进行验证
+提供效率 
+
+验证阶段: 验证住院的目的是确保class文件中的字节流中包含的信息符合虚拟机的要求，
+并且不会损害到jvm自身的安全
+.VerifyError
+.文件格式验证
+  .魔术因子是否正确，0xCAFEBABE
+  .主从版本号是否符合当前虚拟机
+  .常量池中常量类型是不是不支持
+  .etc
+. 元数据验证
+  . 是否有父类
+  . 父类是不是 允许继承
+  . 是否实现了抽象方法
+  . 是否覆盖了父类的final字段
+  . 其他的语义检查
+. 字节码验证
+  . 主要进行数据和控制流的分析，不会出现这样的情况，在操作栈中放置一个int类型
+    但是却给了一个long行的数据
+. 符合应用验证
+  . 调用了一个不存在方法，字段等等
+    符号引用验证的目的是确保解析动作能正常执行，如果无法通过符号引用验证，将会抛出
+  一个java.lang.IncompatibleClassChangeError异常的子类，如java.lang.IllegalAccessError,
+   java.lang.NosuchFieldError 等
+
+.准备阶段: 就是给类变量分配初始值(就是一些默认值)
+
+.解析阶段: 
+   . 类或者接口的解析
+   . 字段解析
+   . 类方法解析
+   . 接口方法解析
+
+```
+30.5 初始化阶段 类加载的最后一步
+```
+1.初始化阶段是执行构造函数<clinit>()方法的过程
+2.<clinit>()方法是有编译器自动收集类中的所有变量的赋值动作和静态语句
+块中的语句合并产生的
+3.静态语句块只能访问到定义在静态语句块之前的变量，定义在他之后的变量
+只能赋值，不能访问
+4.<clinit>()方法与类的构造函数有点区别，他不需要显示的调用父类的构造函数,
+虚拟机会保证子类的<clinit>执行之前，先执行父类的<clinit>,因此在虚拟机
+中首先被执行的是Object的<clinit>()方法
+5.由于父类的<clinit>()方法要先执行，也就是意味着父类中定义的静态语句块，
+要优先于子类
+6.<clinit>()方法对于一个类来说并不是必须的
+7.接口中照样存在<clinit>()方法
+8.虚拟机有义务保证<clinit>()方法的线程安全
+```
+31.JVM类加载器
+```
+1、根(Bootstrap)类加载器:该加载器没有父类加载器。它负责加载虚拟机的核心类库，
+如java.lang.*等。 java.lang.Object就是由根类加载器加载的。根类加载器从系统属性
+sun.boot.class.path所指定的目录中加载类库。根类加载器的实现依赖于底层操作系统，
+属于虚拟机的实现一部分，它并没有继承java.lang.ClassLoader类
+2、扩展(Extension)类加载器:它的父类加载器为根类加载器。它从java.ext.dirs系统属性
+所指定的目录中加载类库，或者从jdk的安装目录的jre\lib\ext子目录(扩展目录)下加载类库
+如果把用户创建的JAR文件放在这个目录下，也会自动由扩展类加载器加载。扩展类加载器
+是纯Java类，是java.lang.ClassLoader类的子类
+3、系统(System)类加载器: 也称为应用加载器，它的父加载器为扩展类加载器。它从
+环境变量classpath或者系统属性java.class.path所指定的目录中加载类，它是用户
+自定义的类加载器的默认父加载器。系统类加载器是纯java类，
+是java.lang.ClassLoader类的子类, 系统加载器的父加载器是扩展类加载
+```
+31.1 自定义一个类加载 ,去加载我们指定的类
+```java
+package com.learn.concurrent.classloader.chapter3;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+
+/**
+ * 我们自己定的的ClassLoader, 我们打算从文件中去拿取
+ * 也就是去磁盘定义一个目录
+ * @ClassName: MyClassLoader
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/1 15:20
+ * History:
+ * @<version> 1.0
+ */
+public class MyClassLoader extends  ClassLoader{
+    /**
+     * 磁盘定义一个目录
+     */
+    private static  final String DEFAULT_DIR = "D:\\app\\classloader";
+
+    /**
+     * 定义一个dir, 让别人可以传入,如果不传入那么就是默认值
+     */
+    private String dir = DEFAULT_DIR;
+
+    /**
+     * classLoader的名字
+     */
+    private String classLoaderName;
+
+    /**
+     * 默认构造函数
+     */
+    MyClassLoader(){
+        super();
+    }
+
+    /**
+     * 这个设置 classLoader的名字
+     * @param classLoaderName
+     */
+    MyClassLoader(String classLoaderName){
+        super();
+        this.classLoaderName = classLoaderName;
+    }
+
+    /**
+     * 将去 父类加载器传入进去, 如果不传入那么就是 系统类加载默认值
+     * @param classLoaderName
+     * @param parent
+     */
+    public  MyClassLoader(String classLoaderName, ClassLoader parent){
+        super(parent);
+        this.classLoaderName = classLoaderName;
+    }
+
+    /**
+     * 重写这个 方法，通过这个方法去查找父类加载器
+     * 这个 name传入 的是 xxx.xxx.xxx.AA 等
+     * 就是去读取文件, 然后将其转换为符合加载的格式
+     * xxx/xxx/xxx/xxx/AAA.class
+     * @param name
+     * @return
+     * @throws ClassNotFoundException
+     */
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        String classPath = name.replace(".", "/");
+        // 文件是 classPath 然后加上 .class 才是class文件
+        // dir是父目录  D:\\app\\classloader + com/learn/concurrent/classloader/chapter3/MyObject.class;
+        File classFile = new File(dir , classPath + ".class");
+        // D:\app\classloader\com\learn\concurrent\classloader\chapter3\MyObject.class
+        if(!classFile.exists()){
+            throw  new ClassNotFoundException("The class " + name + " not fount under");
+        }
+        //将文件读成一个字节数组
+        byte[] classBytes = loadClassBytes(classFile);
+        if(null == classBytes && classBytes.length == 0){
+            throw  new ClassNotFoundException("load the class " + name + " failed");
+        }
+
+        //返回 这定义的类 ，从0开始读取， 可以读取多个class, 从0~1000 是A class
+        // 从1000~200是B class
+        return this.defineClass(name, classBytes, 0, classBytes.length);
+    }
+
+    /**
+     * 将一个文件变成一个数组
+     * @param classFile
+     * @return
+     */
+    private byte[] loadClassBytes(File classFile) {
+        //写成这样的好处就是 不需要你自己去释放流，它会自己去释放
+        // 把文件输入流，转换成内存输出流
+        try(ByteArrayOutputStream b = new ByteArrayOutputStream();
+            FileInputStream fis = new FileInputStream(classFile)) {
+           // 用byte来缓冲 ,一次最多读多少个
+            byte[] buffer = new byte[1024];
+            // 读了多少个 ，如果是负1那么就没有了
+            int len ;
+            // 这个将文件中数据读到 byte数组中
+            while ((len = fis.read(buffer))!=-1){
+                // byte数组 写，这个将buffer的写到 byte数组中
+                  b.write(buffer, 0, len);
+            }
+            //写完之后 flush
+            b.flush();
+            return  b.toByteArray();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return  null;
+        }
+
+    }
+
+    public String getDir() {
+        return dir;
+    }
+
+    public void setDir(String dir) {
+        this.dir = dir;
+    }
+}
+
+```
+31.2 我们需要加载的类
+```java
+package com.learn.concurrent.classloader.chapter3;
+
+/**
+ * @ClassName: MyObject
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/1 15:46
+ * History:
+ * @<version> 1.0
+ */
+public class MyObject {
+    static {
+        System.out.println("My object static block. ");
+    }
+
+    public String hello(){
+        return "Hello World";
+    }
+}
+
+```
+31.3 测试自定义的类加载器
+```java
+package com.learn.concurrent.classloader.chapter3;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+/**
+ * @ClassName: MyClassLoaderTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/1 15:48
+ * History:
+ * @<version> 1.0
+ */
+public class MyClassLoaderTest {
+    public static void main(String[] args) throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
+        // 我们需要编译好的文件从com开拷贝到 那个我建立的 磁盘目录中去
+        // D:\app\classloader\com\learn\concurrent\classloader\chapter3
+        //MyClassLoader 是我们自定义的加载器， 类加载器加载的地方就是我们设置的磁盘目录
+        // D:\app\classloader
+        MyClassLoader classLoader = new MyClassLoader("MyClassLoader");
+         // 这个MyObject 是要加载的类
+        Class<?> aClass = classLoader.loadClass("com.learn.concurrent.classloader.chapter3.MyObject");
+        System.out.println(aClass);
+        // 这里如果那个MyObject 这个文件在这个项目中，那么这个加载就会是系统类加载
+        // 原因是classPath中 有这个文件
+
+        // 所以 我们把 项目中MyObject删除，因为在那个磁盘目录中我们已经将
+        // 编译好的文件 MyObject拷贝到 磁盘目录中放好了
+        // 注意: classLoader的时候 不会去初始化类，这个不在6个主动使用中
+        // 在 newInstance的时候会去初始化类
+        System.out.println(aClass.getClassLoader());
+        // 静态代码块会打印出来来
+        Object o = aClass.newInstance();
+        Method method = aClass.getMethod("hello", new Class<?>[]{});
+        Object result = method.invoke(o, new Object[]{});
+        System.out.println(result);
+
+        //下面是打印的结果
+        //class com.learn.concurrent.classloader.chapter3.MyObject
+        //com.learn.concurrent.classloader.chapter3.MyClassLoader@6d06d69c
+        //My object static block.
+        //Hello World
+    }
+}
+
+```
+31.4、ClassLoader的父委托机制
+```java
+
+package com.learn.concurrent.classloader.chapter3;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+/**
+ * 测试 ClassLoader 双亲委派机制
+ * 1.类加载器的委托是优先交给父加载器先去尝试加载
+ * 2.父加载器和子加载器其实是一种包装关系，或者 包含关系
+ * 3.同一个classLoader(或者是父加载器的父加载器) 加载一个class 在加载完之后,它在堆去会有一个对象 且保持一份
+ * 如果是两个不同的classLoader去加载,那么这里要注意命名空间 产生两个对象
+ * @ClassName: MyClassLoaderTest2
+ * @Description: 测试 ClassLoader 双亲委派机制
+ * @Author: lin
+ * @Date: 2020/4/1 15:48
+ * History:
+ * @<version> 1.0
+ */
+public class MyClassLoaderTest2 {
+    public static void main(String[] args) throws ClassNotFoundException, IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
+
+        MyClassLoader classLoader1 = new MyClassLoader("MyClassLoader-1");
+        //这个加载类的父类加载器是 classLoader1，也就是说这两个是父子关系，
+        // 但是不继承关系 他只一个包装的关系，也就classLoader1包含 classLoader2 但不是继承
+        MyClassLoader classLoader2 = new MyClassLoader("MyClassLoader-2", classLoader1);
+        // classLoader2加载的文件，这里重新设置一个地址，这目录下什么都没有，所以加载不了
+        // 如果采取父委托机制，那么就会让classLoader2的父加载器 去加载, 这个父加载器会去找系统类加载器
+        // 系统类加载器 去找扩展类加载器  ----> 根加载器，然后当根加载器看要加载的没有，那么就会告知
+        // 扩展加载器去加载，如果扩展加载器也没有找到 就告知系统加载器---------------> 系统加载器去加载，
+        // 当系统加载时 也没有，那么就会 去找自定义实现的加载器，当自定义加载器加载时有那么
+        // 就将这个 给 当前请求的加载器， 如果都没有那么就是 报 我们定义的异常
+
+        classLoader2.setDir("D:\\app\\classloader2");
+        Class<?> aClass = classLoader2.loadClass("com.learn.concurrent.classloader.chapter3.MyObject");
+        System.out.println(aClass);
+        System.out.println(((MyClassLoader) aClass.getClassLoader()).getClassLoaderName());
+
+        //打印结果 可以看出这个classLoader1去加载的
+        //class com.learn.concurrent.classloader.chapter3.MyObject
+        //MyClassLoader-1
+
+        //如果classLoader2 没有定义父类加载器会出现什么呢？
+        //出现的结果 就是我们定义的没有找到文件的异常
+        //Exception in thread "main" java.lang.ClassNotFoundException: The class com.learn.concurrent.classloader.chapter3.MyObject not fount under
 
 
+    }
+}
+
+```
+31.5 简单的加密解密
+```java
+
+package com.learn.concurrent.classloader.chapter4;
+
+
+/**
+ * @ClassName: SimpleEncrypt
+ * @Description: 简单加密
+ * @Author: lin
+ * @Date: 2020/4/1 22:08
+ * History:
+ * @<version> 1.0
+ */
+public class SimpleEncrypt {
+   private static  final  String PLAIN = "Hello ClassLoader";
+
+   private static  final byte ENCRYPT_FACTOR = (byte) 0xff;
+
+    public static void main(String[] args) {
+       byte[] bytes = PLAIN.getBytes();
+       byte[] encrypt = new byte[bytes.length];
+        for (int i = 0; i < bytes.length ; i++) {
+            //通过位运算来进行简单加密
+             encrypt[i] = (byte) ( bytes[i] ^ ENCRYPT_FACTOR);
+        }
+        System.out.println(new String(encrypt));
+
+        byte[] decrypt = new byte[encrypt.length];
+        for (int i = 0; i <encrypt.length ; i++) {
+             decrypt[i] =(byte) (encrypt[i] ^ ENCRYPT_FACTOR);
+        }
+        System.out.println(new String(decrypt));
+
+
+    }
+}
+
+```
+31.6 打破双亲委派
+```java
+package com.learn.concurrent.classloader.chapter5;
+
+import com.learn.concurrent.classloader.chapter1.LoaderClass;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+
+/**
+ * 我们自己定的的ClassLoader, 我们打算从文件中去拿取
+ * 也就是去磁盘定义一个目录
+ * @ClassName: MyClassLoader
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/1 15:20
+ * History:
+ * @<version> 1.0
+ */
+public class SimpleClassLoader extends  ClassLoader{
+    /**
+     * 磁盘定义一个目录
+     */
+    private static  final String DEFAULT_DIR = "D:\\app\\revert";
+
+    /**
+     * 定义一个dir, 让别人可以传入,如果不传入那么就是默认值
+     */
+    private String dir = DEFAULT_DIR;
+
+    /**
+     * classLoader的名字
+     */
+    private String classLoaderName;
+
+    /**
+     * 默认构造函数
+     */
+    SimpleClassLoader(){
+        super();
+    }
+
+    /**
+     * 这个设置 classLoader的名字
+     * @param classLoaderName
+     */
+    SimpleClassLoader(String classLoaderName){
+        super();
+        this.classLoaderName = classLoaderName;
+    }
+
+    /**
+     * 将去 父类加载器传入进去, 如果不传入那么就是 系统类加载默认值
+     * @param classLoaderName
+     * @param parent
+     */
+    public SimpleClassLoader(String classLoaderName, ClassLoader parent){
+        super(parent);
+        this.classLoaderName = classLoaderName;
+    }
+
+
+    /**
+     * 重写 loadClass 去覆盖父类的方法
+     * @param name
+     * @param resolve
+     * @return
+     * @throws ClassNotFoundException
+     */
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        Class<?> clazz = null;
+        //java 的这部分还是交给 其父加载器 去查找
+        // 这么去将java中 包 进行处理
+//        if(name.startsWith("java.")){
+//            try {
+//                //系统类加载器
+//                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
+//                clazz = systemClassLoader.loadClass(name);
+//                if(clazz != null){
+//                    if (resolve){
+//                        //解析
+//                        resolveClass(clazz);
+//                    }
+//                    return  clazz;
+//                }
+//            }catch (Exception e){
+//
+//            }
+//        }
+
+        try {
+            clazz = findClass(name);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        if(clazz == null && getParent()!=null){
+            getParent().loadClass(name);
+        }
+
+        return clazz;
+    }
+
+    /**
+     * 重写这个 方法，通过这个方法去查找父类加载器
+     * 这个 name传入 的是 xxx.xxx.xxx.AA 等
+     * 就是去读取文件, 然后将其转换为符合加载的格式
+     * xxx/xxx/xxx/xxx/AAA.class
+     * @param name
+     * @return
+     * @throws ClassNotFoundException
+     */
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        String classPath = name.replace(".", "/");
+        // 文件是 classPath 然后加上 .class 才是class文件
+        // dir是父目录  D:\\app\\classloader + com/learn/concurrent/classloader/chapter3/MyObject.class;
+        File classFile = new File(dir , classPath + ".class");
+        // D:\app\classloader\com\learn\concurrent\classloader\chapter3\MyObject.class
+        if(!classFile.exists()){
+            throw  new ClassNotFoundException("The class " + name + " not fount under");
+        }
+        //将文件读成一个字节数组
+        byte[] classBytes = loadClassBytes(classFile);
+        if(null == classBytes || classBytes.length == 0){
+            throw  new ClassNotFoundException("load the class " + name + " failed");
+        }
+
+        //返回 这定义的类 ，从0开始读取， 可以读取多个class, 从0~1000 是A class
+        // 从1000~200是B class
+        return this.defineClass(name, classBytes, 0, classBytes.length);
+    }
+
+
+
+
+    /**
+     * 将一个文件变成一个数组
+     * @param classFile
+     * @return
+     */
+    private byte[] loadClassBytes(File classFile) {
+        //写成这样的好处就是 不需要你自己去释放流，它会自己去释放
+        // 把文件输入流，转换成内存输出流
+        try(ByteArrayOutputStream b = new ByteArrayOutputStream();
+            FileInputStream fis = new FileInputStream(classFile)) {
+           // 用byte来缓冲 ,一次最多读多少个
+            byte[] buffer = new byte[1024];
+            // 读了多少个 ，如果是负1那么就没有了
+            int len ;
+            // 这个将文件中数据读到 byte数组中
+            while ((len = fis.read(buffer))!=-1){
+                // byte数组 写，这个将buffer的写到 byte数组中
+                  b.write(buffer, 0, len);
+            }
+            //写完之后 flush
+            b.flush();
+            return  b.toByteArray();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return  null;
+        }
+
+    }
+
+    public String getDir() {
+        return dir;
+    }
+
+    public void setDir(String dir) {
+        this.dir = dir;
+    }
+
+    public String getClassLoaderName() {
+        return classLoaderName;
+    }
+}
+
+```
+31.7 需要加载的类
+```java
+package com.learn.concurrent.classloader.chapter5;
+
+/**
+ * @ClassName: SimpleObject
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/1 23:06
+ * History:
+ * @<version> 1.0
+ */
+public class SimpleObject {
+}
+
+```
+31.8 测试打破双亲委派
+```java
+package com.learn.concurrent.classloader.chapter5;
+
+/**
+ * @ClassName: SimpleClassLoaderTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/1 23:05
+ * History:
+ * @<version> 1.0
+ */
+public class SimpleClassLoaderTest {
+    public static void main(String[] args) throws ClassNotFoundException {
+        // 我们要的效果就是 让我们自己定义加载器去加载这个类
+        // 我们通过这种方式打破了双委托机制， 这个去加载的时候 首先将java.* 包的
+        // 给他的父加载器加载，
+        SimpleClassLoader simpleClassLoader = new SimpleClassLoader();
+//        Class<?> aClass = simpleClassLoader.loadClass("com.learn.concurrent.classloader.chapter5.SimpleObject");
+//        System.out.println(aClass.getClassLoader());
+
+
+        // 注意:如果我们将 自己在目录中加一个java.lang.xxx 的包 然后里面写一个
+        // String 的类,  我那个将其代码编译好了之后 将我们自己写的
+        // java.lang.String 的class 放到和 "D:\\app\\revert" 这个同一目录下
+        // 就是这样 D:\app\revert\java\lang\String.class
+        // 然后 我将自己定义的SimpleClassLoader加载器 中 loadClass 取消对 java.lang.xxx
+        // 加载的判断, 然后执行代码
+        Class<?> aClass = simpleClassLoader.loadClass("java.lang.String");
+        System.out.println(aClass.getClassLoader());
+        // 这打印的结果是 java.lang.SecurityException: Prohibited package name: java.lang
+        // 从这个错误来看 报了一个安全的异常错误, 禁止加载 java.lang的包，
+        //
+        // 一般面试就会问 可不可以打破 双委托机制: 这里我们实验了可以打破
+        // 但是java里面对 java.lang.xxx 的加载 进行了安全的验证 和检查
+        // 所以 如果我们自己写一个java.lang.xxx 的包然后 用自己的classLoader进行加载
+        // 那么就会 出现安全异常
+    }
+}
+
+```
+32、classLoader命名空间,运行时包
+``` 
+类加载器的命名空间:
+  .每个类的加载器都有子的命名空间,命名空间由该加载器及其所有父加载器所加载的类组成
+  .在同一个命名空间中，不会出现完整的名字
+
+运行时包: 
+   .父类加载器看不到子类加载器加载的类
+   .不同命名空间下的类加载之间的类互相不可访问
+```
+33、类的卸载以及classLoader的卸载
+```
+JVM的class只有满足以下三个条件，才能被GC回收，也就是该class被卸载:
+ .该类所有的实例都已经被GC。
+ .加载类的ClassLoader实例已经被GC
+ .该类的java.lang.Class对象没有在任何地方被引用
+ .GC的时机我们是不可控制的，那么同样的我们对于Class的卸载也是不可控的。
+```
 
