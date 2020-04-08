@@ -1,4 +1,4 @@
-package com.learn.concurrenty.design.chapter15;
+package com.learn.concurrent.design.chapter15;
 
 /**
  *  Thead-per-message 设计， 这个就是在收到请求后 去开启一个线程来处理事情，
@@ -13,7 +13,7 @@ package com.learn.concurrenty.design.chapter15;
 public class Message {
     private final  String value;
 
-    Message(String value){
+    public Message(String value){
         this.value = value;
     }
 

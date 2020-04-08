@@ -1,4 +1,4 @@
-package com.learn.concurrenty.design.chapter16;
+package com.learn.concurrent.design.chapter16;
 
 /**
  * @ClassName: CounterTest

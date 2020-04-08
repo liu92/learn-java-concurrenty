@@ -1,6 +1,6 @@
-package com.learn.concurrenty.design.chapter15;
-
+package com.learn.concurrent.design.chapter15;
 import java.util.stream.IntStream;
+
 
 /**
  * @ClassName: PerThreadClient

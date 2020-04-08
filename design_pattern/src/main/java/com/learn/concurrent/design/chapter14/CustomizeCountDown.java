@@ -1,4 +1,4 @@
-package com.learn.concurrenty.design.chapter14;
+package com.learn.concurrent.design.chapter14;
 
 /**
  * 参照jdk CountDownLatch 自定义实现

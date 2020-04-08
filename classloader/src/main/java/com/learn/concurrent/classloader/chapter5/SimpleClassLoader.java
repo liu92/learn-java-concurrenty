@@ -152,7 +152,7 @@ public class SimpleClassLoader extends  ClassLoader{
             // 这个将文件中数据读到 byte数组中
             while ((len = fis.read(buffer))!=-1){
                 // byte数组 写，这个将buffer的写到 byte数组中
-                  b.write(buffer, 0, len);
+                b.write(buffer, 0, len);
             }
             //写完之后 flush
             b.flush();

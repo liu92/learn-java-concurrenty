@@ -1,6 +1,4 @@
-package com.learn.concurrenty.design.chapter16;
-
-import com.learn.concurrenty.DefaultThreadFactory;
+package com.learn.concurrent.design.chapter16;
 
 import java.io.IOException;
 import java.net.ServerSocket;

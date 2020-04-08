@@ -1,6 +1,6 @@
-package com.learn.concurrenty.design.chapter15;
+package com.learn.concurrent.design.chapter15;
 
-import com.learn.concurrenty.DefaultThreadFactory;
+import com.learn.concurrent.design.DefaultThreadFactory;
 
 import java.util.Random;
 import java.util.concurrent.*;
