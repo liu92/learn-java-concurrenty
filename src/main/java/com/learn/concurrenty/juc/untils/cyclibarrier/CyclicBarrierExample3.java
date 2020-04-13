@@ -1,4 +1,4 @@
-package com.learn.concurrenty.juc.untils;
+package com.learn.concurrenty.juc.untils.cyclibarrier;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;

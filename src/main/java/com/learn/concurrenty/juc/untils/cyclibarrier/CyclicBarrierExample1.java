@@ -1,4 +1,4 @@
-package com.learn.concurrenty.juc.untils;
+package com.learn.concurrenty.juc.untils.cyclibarrier;
 
 import com.learn.concurrenty.DefaultThreadFactory;
 
