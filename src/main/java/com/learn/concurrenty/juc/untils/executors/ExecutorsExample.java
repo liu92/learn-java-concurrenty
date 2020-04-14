@@ -29,6 +29,7 @@ public class ExecutorsExample {
         // 这个转换会失败，因为ThreadPoolExecutor不是 newSingleThreadExecutor的实例
 //        System.out.println(((ThreadPoolExecutor)executorService).getActiveCount());
 
+        //boxed将其封箱，就是将int装箱成integer
         IntStream.range(0, 10).boxed().forEach(i -> executorService
                 .execute(()->{
                     try {
