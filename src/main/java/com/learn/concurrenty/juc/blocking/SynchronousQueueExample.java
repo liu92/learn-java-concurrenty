@@ -12,7 +12,7 @@ import java.util.concurrent.SynchronousQueue;
  * @<version> 1.0
  */
 public class SynchronousQueueExample {
-    public  SynchronousQueue creat(){
-        return  new SynchronousQueue();
+    public static <T> SynchronousQueue<T> creat(){
+        return  new SynchronousQueue<>();
     }
 }
