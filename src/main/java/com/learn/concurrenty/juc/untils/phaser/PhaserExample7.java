@@ -2,7 +2,6 @@ package com.learn.concurrenty.juc.untils.phaser;
 
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * @ClassName: PhaserExample3

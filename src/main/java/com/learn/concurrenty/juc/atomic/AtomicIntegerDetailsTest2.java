@@ -1,7 +1,5 @@
 package com.learn.concurrenty.juc.atomic;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
  * @ClassName: AtomicIntegerDetailsTest
  * @Description:

@@ -1,6 +1,5 @@
 package com.learn.concurrenty.juc.atomic;
 
-import com.learn.concurrenty.chapter11.Test2;
 
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 

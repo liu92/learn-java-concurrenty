@@ -3,7 +3,7 @@ package com.learn.concurrenty.juc.collections;
 /**
  * 优先级 链表
  * @ClassName: PriorityLinkedList
- * @Description: 自行实现LinkedList
+ * @Description:
  * @Author: lin
  * @Date: 2020/4/16 9:28
  * History:

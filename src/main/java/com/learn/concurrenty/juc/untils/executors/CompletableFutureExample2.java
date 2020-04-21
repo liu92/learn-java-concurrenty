@@ -1,8 +1,10 @@
 package com.learn.concurrenty.juc.untils.executors;
 
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 /**
  * @ClassName: CompletableFutureExample1

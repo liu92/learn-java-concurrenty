@@ -2,7 +2,7 @@ package com.learn.concurrenty.juc.collections;
 
 /**
  * @ClassName: MyLinkedList
- * @Description: 自行实现LinkedList
+ * @Description: 自定义实现LinkedList
  * @Author: lin
  * @Date: 2020/4/16 9:28
  * History:

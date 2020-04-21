@@ -6119,6 +6119,35 @@ public class SimpleClassLoaderTest {
 }
 
 ```
+31.9 线程上下文以及数据库驱动
+```java
+package com.learn.concurrent.classloader.chapter6;
+
+import com.learn.concurrent.classloader.chapter3.MyClassLoader;
+
+/**
+ * 线程上下文以及数据库驱动
+ *
+ * @ClassName: ThreadContextClassLoader
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class ThreadContextClassLoader {
+    public static void main(String[] args) {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        System.out.println(classLoader);
+        Thread.currentThread().setContextClassLoader(new MyClassLoader());
+        // 这种线程上下文，就相当于jdk开了一个 后门 去破坏父委托机制
+        System.out.println(Thread.currentThread().getContextClassLoader());
+
+    }
+}
+
+```
+
 32、classLoader命名空间,运行时包
 ``` 
 类加载器的命名空间:
@@ -6294,10 +6323,6231 @@ public class UnsafeFooTest {
 }
 
 ```
+35. AtomicInteger原子类的使用
+```java
+package com.learn.concurrenty.juc.atomic;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * @ClassName: AtomicIntegerTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 12:12
+ * History:
+ * @<version> 1.0
+ */
+public class AtomicIntegerTest {
+    private static  final Set<Integer> SET = Collections.synchronizedSet(new HashSet<>());
+    public static void main(String[] args) throws InterruptedException {
+
+        final AtomicInteger value = new AtomicInteger();
+        Thread t1 = new Thread(() -> {
+            int x = 0;
+            int count = 500;
+            while (x < count){
+                int v = value.getAndIncrement();
+                SET.add(v);
+                System.out.println(Thread.currentThread().getName() + ":" + v);
+                x++;
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            int x = 0;
+            int count = 500;
+            while (x < count){
+                int v = value.getAndIncrement();
+                SET.add(v);
+                System.out.println(Thread.currentThread().getName() + ":" + v);
+                x++;
+            }
+        });
+
+        Thread t3 = new Thread(()->{
+                int x = 0;
+                int count = 500;
+                while (x < count){
+                    int v = value.getAndIncrement();
+                    SET.add(v);
+                    System.out.println(Thread.currentThread().getName() + ":" + v);
+                    x++;
+                }
+           });
+
+        t1.start();
+        t2.start();
+        t3.start();
+        t1.join();
+        t2.join();
+        t3.join();
+        System.out.println(SET.size());
+    }
+}
+
+```
+35.1 AtomicIntegerDetailsTest 测试
+```java
+package com.learn.concurrenty.juc.atomic;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * @ClassName: AtomicIntegerDetailsTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 14:18
+ * History:
+ * @<version> 1.0
+ */
+public class AtomicIntegerDetailsTest {
+    public static void main(String[] args) {
+        //get and set
+//        AtomicInteger  getAndSet = new AtomicInteger(10);
+//        int result = getAndSet.getAndAdd(10);
+//        System.out.println(result);
+//        System.out.println(getAndSet.get());
+
+
+        AtomicInteger  atomicInteger = new AtomicInteger(10);
+        // 将 期望值12和 当前值10 进行比较，在AtomicInteger中 value表示当前值
+        // 最快失败
+        atomicInteger.compareAndSet(12, 20);
+    }
+
+}
+
+```
+35.2  通过 compareAndSet 尝试去 获取锁,如果获取不到锁就去做其他的
+```java
+package com.learn.concurrenty.juc.atomic;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * @ClassName: AtomicIntegerDetailsTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 14:18
+ * History:
+ * @<version> 1.0
+ */
+public class AtomicIntegerDetailsTest2 {
+    private final  static  CompareAndSetLock LOCK = new CompareAndSetLock();
+    public static void main(String[] args) {
+        for (int i = 0; i <2 ; i++) {
+            new Thread(){
+                @Override
+                public void run() {
+                    try {
+//                        doSomething();
+                        doSomething2();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }.start();
+        }
+    }
+
+    private static void doSomething() throws InterruptedException {
+        synchronized (AtomicIntegerDetailsTest2.class){
+            System.out.println(Thread.currentThread().getName()+" ");
+            Thread.sleep(100000);
+        }
+    }
+
+    /**
+     * 通过 compareAndSet 尝试去 获取锁,如果获取不到锁就去做其他的
+     * @throws InterruptedException
+     */
+    private static void doSomething2() throws InterruptedException {
+        try {
+            LOCK.tryLock();
+            System.out.println(Thread.currentThread().getName()+" get the lock");
+            Thread.sleep(100000);
+        } catch (GetLockException e) {
+            e.printStackTrace();
+        }finally {
+            // 这个地方有问题，就是有的线程没有抢到锁，但是会去释放锁，
+            // 使用这个 compareAndSet(1,0) 去进行比较替换处理，其他线程抢到锁之后
+            // 已经将其更新，而这时没有抢到锁的线程 就通过 其他线程更新的 value
+            // 再来比较 compareAndSet(1,0) 而这时 去比较 期望值和当前值相等，就会将值更新为0
+            // 这样就会造成 锁被多个线程拿到， 所以谁拿到锁就是谁去释放
+            LOCK.unLock();
+        }
+
+    }
+
+
+}
+
+```
+35.2.1
+```java
+package com.learn.concurrenty.juc.atomic;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * @ClassName: CompareAndSetLock
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 15:10
+ * History:
+ * @<version> 1.0
+ */
+public class CompareAndSetLock {
+    private final AtomicInteger value = new AtomicInteger(0);
+
+    private Thread lockedThread;
+
+    public void tryLock() throws GetLockException {
+        boolean success = value.compareAndSet(0, 1);
+        if(!success){
+            throw  new GetLockException("Get the Lock failed");
+        }else{
+            // 那个线程获得了锁，那么就是那个线程去释放
+            lockedThread = Thread.currentThread();
+        }
+    }
+
+    public void unLock(){
+        //这个锁已经被释放了
+        if(0 == value.get() || lockedThread ==null){
+            return;
+        }
+        if(lockedThread == Thread.currentThread()){
+            value.compareAndSet(1, 0);
+        }
+
+    }
+}
+
+```
+
+35.3 AtomicReference 使用
+```java
+package com.learn.concurrenty.juc.atomic;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * @ClassName: AtomicReferenceTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 16:26
+ * History:
+ * @<version> 1.0
+ */
+public class AtomicReferenceTest {
+    public static void main(String[] args) {
+        //4个字节的引用类型
+        AtomicReference<Simple> atomicReference = new AtomicReference<Simple>(new Simple("lin",12));
+        System.out.println(atomicReference.get());
+        atomicReference.compareAndSet(new Simple("sdfs", 22),
+                new Simple("sdfs",234));
+    }
+
+
+    static class Simple{
+        private String name;
+        private int age;
+        Simple(String name, int age){
+            this.name = name;
+            this.age = age;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+
+        public void setAge(int age) {
+            this.age = age;
+        }
+    }
+}
+
+```
+35.4 AtomicIntegerFieldUpdater 使用
+```java
+package com.learn.concurrenty.juc.atomic;
+
+
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+
+/**
+ * @ClassName: AtomicIntegerFieldUpdaterTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 16:59
+ * History:
+ * @<version> 1.0
+ */
+public class AtomicIntegerFieldUpdaterTest {
+    public static void main(String[] args) {
+        final AtomicIntegerFieldUpdater<TestMe> updater = AtomicIntegerFieldUpdater.
+                newUpdater(TestMe.class, "i");
+        TestMe testMe = new TestMe();
+        int t = 2 ;
+        for (int i = 0; i < t; i++) {
+            new Thread(){
+                @Override
+                public void run() {
+                    final  int MAX = 20 ;
+                    for (int i = 0; i < MAX; i++) {
+                        int v = updater.getAndIncrement(testMe);
+                        System.out.println(Thread.currentThread().getName() + "=>"+ v );
+                    }
+                } 
+            };
+        }
+    }
+
+    static class TestMe{
+        volatile int i;
+    }
+}
+```
+35.5 AtomicIntegerFieldUpdater 测试2
+```java
+package com.learn.concurrenty.juc.atomic;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+
+/**
+ * 1、想让类的属性操作具备原子性
+ *    1.1 volatile
+ *    1.2 非private,protected(如果是当前类也可以是private ，protected)
+ *    1.3 类型必须一致
+ *    1.4 其他
+ * 2.不想使用锁(包括显示锁或者重量级锁synchronized)
+ * 3.大量需要原子类型修饰的对象，相对比较耗费内存
+ *  比如使用AtomicReference来说修饰的时候，如果是一个Node ，那么这个node就是 占用16，再加上他本身AtomicReference<Node> 就会是32
+ *  而在ConcurrentSkipListMap jdk1.6的版本中一般使用AtomicReferenceFieldUpdater来进行修饰，
+ *  在这个jdk1.8 已经没有使用AtomicReferenceFieldUpdater来进行修饰了
+ *
+ * @ClassName: AtomicIntegerFieldUpdaterTest2
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 22:34
+ * History:
+ * @<version> 1.0
+ */
+public class AtomicIntegerFieldUpdaterTest2 {
+    private volatile  int i;
+
+    private AtomicInteger  j = new AtomicInteger();
+
+    private AtomicIntegerFieldUpdater<AtomicIntegerFieldUpdaterTest2> updater = AtomicIntegerFieldUpdater.
+            newUpdater(AtomicIntegerFieldUpdaterTest2.class, "i");
+
+    public void update(int newValue){
+        updater.compareAndSet(this, i , newValue);
+    }
+
+    public int get(){
+        return  i;
+    }
+
+    public static void main(String[] args) {
+        AtomicIntegerFieldUpdaterTest2 test2 = new AtomicIntegerFieldUpdaterTest2();
+        test2.update(10);
+        System.out.println(test2.get());
+    }
+}
+
+```
+
+35.6 AtomicBooleanFlag原子类的使用
+```java
+package com.learn.concurrenty.juc.atomic;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * @ClassName: AtomicBooleanFlag
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 16:06
+ * History:
+ * @<version> 1.0
+ */
+public class AtomicBooleanFlag {
+    /**
+     * 这个可以替代 volatile 和 boolean 作为一个flag的标志
+     */
+    private final  static AtomicBoolean flag = new AtomicBoolean(true);
+    public static void main(String[] args) throws InterruptedException {
+        new Thread(){
+            @Override
+            public void run() {
+                while (flag.get()){
+                    try {
+                        Thread.sleep(1000);
+                        System.out.println("I am working");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                System.out.println("I am finished.");
+            }
+        }.start();
+
+        Thread.sleep(5000);
+        flag.set(false);
+    }
+}
+
+```
+35.7 JitTest
+```java
+package com.learn.concurrenty.juc.atomic;
+
+/**
+ * @ClassName: JitTest
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/2 14:00
+ * History:
+ * @<version> 1.0
+ */
+public class JitTest {
+    private static volatile   boolean init = false;
+    public static void main(String[] args) {
+        new Thread(){
+            @Override
+            public void run() {
+                while (!init){
+                    /**
+                     * 这里有问题
+                     * 就是在不同的jdk 下会有不同的情况
+                     *
+                     * 有的jdk情况下 这里会退出，而有的不会退出
+                     * 造成这样的原因是jit 的进行了优化
+                     *
+                     * 就是在jdk1.8 下 如果这while循环体重没有其他的代码是
+                     * 会优化成这样
+                     * while(true){}
+                     * 如果这个里面有其他的代码 就不会优化,比如这样
+                     * while(!init){
+                     *     System.out.println(".")
+                     * }
+                     *
+                     * 那么解决这样的问题,就是变量要加上volatile,安装jdk规范来
+                     * 避免不必要的争议
+                     *
+                     */
+                }
+            }
+        }.start();
+
+        new Thread(){
+            @Override
+            public void run() {
+               init = true;
+                System.out.println("set init to true.");
+            }
+        }.start();
+    }
+}
+
+```
+36. ArrayBlockingQueue阻塞队列学习
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import java.util.concurrent.ArrayBlockingQueue;
+
+/**
+ * @ClassName: ArrayBlockingQueueExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/17 14:41
+ * History:
+ * @<version> 1.0
+ */
+public class ArrayBlockingQueueExample1 {
+
+    /**
+     * 1.FIFO(first in first out)
+     * 2.once created , the capacity cannot be changed.
+     * @param size
+     * @param <T>
+     * @return
+     */
+    public <T> ArrayBlockingQueue<T> creat(int size){
+        return  new ArrayBlockingQueue<>(size);
+    }
+}
+
+```
+36.1 junit 测试ArrayBlockingQueue
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.hamcrest.core.IsNull.nullValue;
+import static org.junit.Assert.assertThat;
+
+
+public class ArrayBlockingQueueExample1Test {
+
+    private ArrayBlockingQueueExample1 example1;
+
+    @Before
+    public void setUp(){
+        example1 = new ArrayBlockingQueueExample1();
+    }
+
+    @After
+    public void  tearDown(){
+        example1 = null;
+    }
+
+
+    /**
+     * Inserts the specified element at the tail of this queue if it is
+     * possible to do so immediately without exceeding the queue's capacity,
+     * returning {@code true} upon success and throwing an
+     * {@code IllegalStateException} if this queue is full.
+     */
+    @Test
+    public void testAddMethodNotExceedCapacity(){
+        ArrayBlockingQueue<String> queue = example1.creat(5);
+        assertThat(queue.add("Hello1"), equalTo(true));
+        assertThat(queue.add("Hello2"), equalTo(true));
+        assertThat(queue.add("Hello3"), equalTo(true));
+        assertThat(queue.add("Hello4"), equalTo(true));
+        assertThat(queue.add("Hello5"), equalTo(true));
+//        assertThat(queue.size(), equalTo(5));
+    }
+
+
+    /**
+     * 超过这个队列的容量
+     */
+    @Test
+    public void testAddMethodExceedExceedCapacity(){
+        ArrayBlockingQueue<String> queue = example1.creat(5);
+        assertThat(queue.add("Hello1"), equalTo(true));
+        assertThat(queue.add("Hello2"), equalTo(true));
+        assertThat(queue.add("Hello3"), equalTo(true));
+        assertThat(queue.add("Hello4"), equalTo(true));
+        assertThat(queue.add("Hello5"), equalTo(true));
+        assertThat(queue.add("Hello6"), equalTo(true));
+//        assertThat(queue.size(), equalTo(true));
+    }
+
+
+    @Test
+    public void testPutMethodExceedExceedCapacity() throws InterruptedException {
+        ArrayBlockingQueue<String> queue = example1.creat(5);
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        scheduledExecutorService.schedule(()->{
+            try {
+                assertThat(queue.take(), equalTo("Hello1"));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        },1 , TimeUnit.SECONDS);
+        // 这里也应该等一下，因为在这里的时候任务都还没有执行就 shutdown了
+        scheduledExecutorService.shutdown();
+
+        // 使用put方法时会抛出异常，这个时候我们可以知道为啥会抛出异常
+        // 因为当这个添加数量多于这个阻塞队列容量是，就会被阻塞
+        queue.put("Hello1");
+        queue.put("Hello2");
+        queue.put("Hello3");
+        queue.put("Hello4");
+        queue.put("Hello5");
+        queue.put("Hello6");
+//        fail("should not process to here");
+
+    }
+
+    @Test
+    public void testPoll(){
+        ArrayBlockingQueue<String> queue = example1.creat(2);
+        queue.add("Hello1");
+        queue.add("Hello2");
+
+        assertThat(queue.poll(), equalTo("Hello1"));
+        assertThat(queue.poll(), equalTo("Hello2"));
+        assertThat(queue.poll(), nullValue());
+    }
+
+}
+```
+36.2 DelayQueue 队列
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.SynchronousQueue;
+
+/**
+ *
+ * 1.The delay queue will ordered by expired time? yes
+ * 2.When poll the empty delay queue will return null? use take?
+ * 3.when less  the expire time will return quickly?  yes
+ * 4.Even though unexpired elements cannot be remove using {@code take} or {@code poll}
+ * 5.This queue does not permit null elements.
+ * 6.Use iterator can return quickly?
+ *
+ * NOTICE: The DelayQueue elements must implement the {@link java.util.concurrent.Delayed}
+ * The DelayQueue is a unbounded queue.
+ * @ClassName: DelayQueueExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/17 17:31
+ * History:
+ * @<version> 1.0
+ */
+public class DelayQueueExample {
+    public static <T extends Delayed> DelayQueue<T> creat(){
+        return  new DelayQueue<>();
+    }
+}
+
+```
+36.2.1 DelayQueue队列 junit测试
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import org.junit.Test;
+
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.Assert.assertThat;
+
+public class DelayQueueExampleTest {
+
+    @Test
+    public  void testAdd(){
+        DelayQueue<DelayElement<String>> delayQueue = DelayQueueExample.creat();
+        DelayElement<String> delayed1 = DelayElement.of("Delayed1", 1000);
+        delayQueue.add(delayed1);
+        assertThat(delayQueue.size(), equalTo(1));
+        assertThat(delayQueue.peek(), is(delayed1));
+    }
+
+
+    static class  DelayElement<E> implements Delayed{
+
+        private final E e;
+
+        private final long expireTime;
+
+        DelayElement(E e, long delay){
+            this.e = e;
+            this.expireTime = System.currentTimeMillis() + delay;
+        }
+
+        static <T> DelayElement<T> of(T t, long delay){
+            return  new DelayElement<>(t, delay);
+        }
+
+
+        /**
+         * Returns the remaining delay associated with this object, in the
+         * given time unit.
+         *
+         * @param unit the time unit
+         * @return the remaining delay; zero or negative values indicate
+         * that the delay has already elapsed
+         */
+        @Override
+        public long getDelay(TimeUnit unit) {
+            long diff = expireTime - System.currentTimeMillis();
+            return unit.convert(diff, TimeUnit.MILLISECONDS);
+        }
+
+        /**
+         * Compares this object with the specified object for order.  Returns a
+         * negative integer, zero, or a positive integer as this object is less
+         * than, equal to, or greater than the specified object.
+         *
+         * <p>The implementor must ensure <tt>sgn(x.compareTo(y)) ==
+         * -sgn(y.compareTo(x))</tt> for all <tt>x</tt> and <tt>y</tt>.  (This
+         * implies that <tt>x.compareTo(y)</tt> must throw an exception iff
+         * <tt>y.compareTo(x)</tt> throws an exception.)
+         *
+         * <p>The implementor must also ensure that the relation is transitive:
+         * <tt>(x.compareTo(y)&gt;0 &amp;&amp; y.compareTo(z)&gt;0)</tt> implies
+         * <tt>x.compareTo(z)&gt;0</tt>.
+         *
+         * <p>Finally, the implementor must ensure that <tt>x.compareTo(y)==0</tt>
+         * implies that <tt>sgn(x.compareTo(z)) == sgn(y.compareTo(z))</tt>, for
+         * all <tt>z</tt>.
+         *
+         * <p>It is strongly recommended, but <i>not</i> strictly required that
+         * <tt>(x.compareTo(y)==0) == (x.equals(y))</tt>.  Generally speaking, any
+         * class that implements the <tt>Comparable</tt> interface and violates
+         * this condition should clearly indicate this fact.  The recommended
+         * language is "Note: this class has a natural ordering that is
+         * inconsistent with equals."
+         *
+         * <p>In the foregoing description, the notation
+         * <tt>sgn(</tt><i>expression</i><tt>)</tt> designates the mathematical
+         * <i>signum</i> function, which is defined to return one of <tt>-1</tt>,
+         * <tt>0</tt>, or <tt>1</tt> according to whether the value of
+         * <i>expression</i> is negative, zero or positive.
+         *
+         * @param delayedObject the object to be compared.
+         * @return a negative integer, zero, or a positive integer as this object
+         * is less than, equal to, or greater than the specified object.
+         * @throws NullPointerException if the specified object is null
+         * @throws ClassCastException   if the specified object's type prevents it
+         *                              from being compared to this object.
+         */
+        @Override
+        public int compareTo(Delayed delayedObject) {
+            DelayElement delayElement =(DelayElement) delayedObject;
+            if(this.expireTime < delayElement.getExpireTime()){
+                return  -1;
+            }
+            else  if(this.expireTime > delayElement.getExpireTime()) {
+                return 1;
+            }else {
+                return 0;
+            }
+        }
+
+
+        public E getData(){
+            return e;
+        }
+
+        public long getExpireTime(){
+            return expireTime;
+        }
+    }
+}
+```
+36.3 LinkedBlockingQueue队列
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import java.util.concurrent.LinkedBlockingQueue;
+
+/**
+ * @ClassName: LinkedBlockingQueueExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/17 14:41
+ * History:
+ * @<version> 1.0
+ */
+public class LinkedBlockingQueueExample {
+
+    /**
+     * 1.FIFO(first in first out)
+     * 2.once created , the capacity cannot be changed.
+     * @param size
+     * @param <T>
+     * @return
+     */
+    public <T> LinkedBlockingQueue<T> creat(int size){
+        return  new LinkedBlockingQueue<>(size);
+    }
+}
+
+```
+36.3.1 LinkedBlockingQueue 单元例测试
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.concurrent.LinkedBlockingQueue;
+
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.Assert.*;
+
+public class LinkedBlockingQueueExampleTest {
+    private LinkedBlockingQueueExample example;
+
+
+    @Before
+    public void setUp(){
+        example = new LinkedBlockingQueueExample();
+    }
+
+    @After
+    public void  tearDown(){
+        example = null;
+    }
+
+
+    @Test
+    public void testInsertData(){
+        LinkedBlockingQueue<String> queue = example.creat(2);
+        assertThat(queue.offer("data1"), equalTo(true));
+        assertThat(queue.offer("data1"), equalTo(true));
+        assertThat(queue.offer("data1"), equalTo(false));
+    }
+}
+```
+36.4 LinkedTransferQueue 队列学习
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.LinkedTransferQueue;
+
+/**
+ * LinkedTransferQueue 担保 递出去的元素必须被消费
+ *
+ * @ClassName: LinkedTransferQueueExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/17 17:31
+ * History:
+ * @<version> 1.0
+ */
+public class LinkedTransferQueueExample {
+    public static <T > LinkedTransferQueue<T> creat(){
+        return  new LinkedTransferQueue<>();
+    }
+}
+
+```
+36.4.1 LinkedTransferQueue 队列junit 测试
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import org.junit.Test;
+
+import java.util.concurrent.LinkedTransferQueue;
+
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.Assert.*;
+
+public class LinkedTransferQueueExampleTest {
+
+    /**
+     * Transfers the element to a waiting consumer immediately, if possible.
+     * Question
+     * when return the false that means at this time no consumer waiting, how about the element ?
+     * will store into the queue?
+     *
+     * Answer:
+     *  without enqueuing the element.
+     */
+    @Test
+    public void testTryTransfer()  {
+        LinkedTransferQueue<String> queue = LinkedTransferQueueExample.creat();
+        // 没有消费者 这个元素是不会放入进去的
+        boolean result = queue.tryTransfer("Transfer");
+        assertThat(result, equalTo(false));
+        assertThat(queue.size(), equalTo(0));
+    }
+
+}
+```
+36.5 PriorityBlockingQueue 队列
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import java.util.concurrent.PriorityBlockingQueue;
+
+/**
+ * @ClassName: ArrayBlockingQueueExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/17 14:41
+ * History:
+ * @<version> 1.0
+ */
+public class PriorityBlockingQueueExample {
+
+    /**
+     * 1.FIFO(first in first out)
+     * 2.once created , the capacity cannot be changed.
+     * @param size
+     * @param <T>
+     * @return
+     */
+    public <T> PriorityBlockingQueue<T> creat(int size){
+        return  new PriorityBlockingQueue<>(size);
+    }
+}
+
+```
+36.5.1 PriorityBlockingQueueTest 单元例测试
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.util.concurrent.PriorityBlockingQueue;
+
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.Assert.*;
+
+public class PriorityBlockingQueueExampleTest {
+    private PriorityBlockingQueueExample example;
+
+    @Before
+    public void setUp(){
+        example = new PriorityBlockingQueueExample();
+    }
+
+    @After
+    public void  tearDown(){
+        example = null;
+    }
+
+    @Test
+    public  void  testAddNewElement(){
+        PriorityBlockingQueue<String> queue = example.creat(5);
+        assertThat(queue.add("Hello1"), equalTo(true));
+        assertThat(queue.add("Hello2"), equalTo(true));
+        assertThat(queue.add("Hello3"), equalTo(true));
+        assertThat(queue.add("Hello4"), equalTo(true));
+        assertThat(queue.add("Hello5"), equalTo(true));
+        assertThat(queue.add("Hello6"), equalTo(true));
+        assertThat(queue.size(), equalTo(6));
+    }
+}
+```
+36.6 SynchronousQueueExample
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import java.util.concurrent.SynchronousQueue;
+
+/**
+ * @ClassName: SynchronousQueueExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/17 17:31
+ * History:
+ * @<version> 1.0
+ */
+public class SynchronousQueueExample {
+    public static <T> SynchronousQueue<T> creat(){
+        return  new SynchronousQueue<>();
+    }
+}
+
+```
+36.6.1 SynchronousQueueExampleTest junit测试
+```java
+package com.learn.concurrenty.juc.blocking;
+
+import org.junit.Test;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.Assert.*;
+
+public class SynchronousQueueExampleTest {
+
+    @Test
+    public  void testAdd() throws InterruptedException {
+        SynchronousQueue<String> queue = SynchronousQueueExample.creat();
+        Executors.newSingleThreadExecutor().submit(()->{
+            try {
+                assertThat(queue.take(), equalTo("SynchronousQueue"));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        TimeUnit.MILLISECONDS.sleep(5);
+        assertThat(queue.add("SynchronousQueue"), equalTo(true));
+    }
+
+}
+```
+37. 学习 java.util.concurrent 包下面api
+```java
+package com.learn.concurrenty.juc.untils.condition;
+
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * @ClassName: ConditionExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 14:32
+ * History:
+ * @<version> 1.0
+ */
+public class ConditionExample {
+
+    private final static ReentrantLock LOCK = new ReentrantLock();
+    private final static Condition CONDITION = LOCK.newCondition();
+    private static int data = 0;
+    private static volatile boolean noUse = true;
+
+    public static void main(String[] args) {
+        new Thread(()->{
+            for (; ;) {
+              buildData();
+            }
+        }).start();
+
+        new Thread(()->{
+            for (; ;) {
+                useData();
+            }
+        }).start();
+    }
+
+
+    public static void buildData(){
+        try {
+            LOCK.lock();    // synchronize key word  #monitor enter
+            while (noUse){
+                // 看看是否已使用，如果未使用那么就不能生产，就继续等待
+                // 等着数据被消费
+                CONDITION.await();   // monitor.wait()
+            }
+            // 如果消费了，那么这里就生产
+            data++;
+            Optional.of("Produce:" + data).ifPresent(System.out::println);
+            // 休眠，模拟这个生产过程比较慢
+            TimeUnit.SECONDS.sleep(1);
+            // 生产了那么这里就是 没有使用
+            noUse = true;
+            // 生产好了之后进行通知
+            CONDITION.signal();     // monitor.notify()
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            LOCK.unlock();      // synchronize end  #monitor exit
+        }
+    }
+
+    public static void useData(){
+        try {
+            LOCK.lock();
+            while (!noUse){
+                CONDITION.await();
+            }
+            TimeUnit.SECONDS.sleep(1);
+            Optional.of("Consumer:" + data).ifPresent(System.out::println);
+            noUse = false;
+            CONDITION.signal();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+             LOCK.unlock();
+        }
+    }
+
+}
+
+``` 
+37.2 Condition2 测试
+```java
+package com.learn.concurrenty.juc.untils.condition;
+
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * @ClassName: ConditionExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 14:32
+ * History:
+ * @<version> 1.0
+ */
+public class ConditionExample2 {
+
+    private final static ReentrantLock LOCK = new ReentrantLock(true);
+    private final static Condition CONDITION = LOCK.newCondition();
+    private static int data = 0;
+    private static volatile boolean noUse = true;
+
+    /**
+     * 不能100%保证公平
+     * 在上面公平锁测试情况暂时没有看出什么问题，但是在非公平锁下面就会有问题
+     * 可能出现  生产者 一直生产 但是消费者没有消费
+     *
+     * 1. 不使用condition  只是使用lock 这种方式可以吗？  不能
+     * 2. the producer get the lock but invoke await method and not jump out the lock statement block
+     * why the consumer can get the lock still ?
+     * 3. 不使用 lock 只使用 condition ?
+     * @param args
+     */
+    public static void main(String[] args) {
+        new Thread(()->{
+            for (; ;) {
+              buildData();
+            }
+        }).start();
+
+        new Thread(()->{
+            for (; ;) {
+                useData();
+            }
+        }).start();
+    }
+
+
+    public static void buildData(){
+        try {
+            LOCK.lock();    // synchronize key word  #monitor enter
+//            while (noUse){
+//                // 看看是否已使用，如果未使用那么就不能生产，就继续等待
+//                // 等着数据被消费
+//                CONDITION.await();   // monitor.wait()
+//            }
+            // 如果消费了，那么这里就生产
+            data++;
+            Optional.of("Produce:" + data).ifPresent(System.out::println);
+            // 休眠，模拟这个生产过程比较慢
+            TimeUnit.SECONDS.sleep(1);
+            // 生产了那么这里就是 没有使用
+//            noUse = true;
+            // 生产好了之后进行通知
+//            CONDITION.signal();     // monitor.notify()
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            LOCK.unlock();      // synchronize end  #monitor exit
+        }
+    }
+
+    public static void useData(){
+        try {
+            LOCK.lock();
+//            while (!noUse){
+//                CONDITION.await();
+//            }
+            TimeUnit.SECONDS.sleep(1);
+            Optional.of("Consumer:" + data).ifPresent(System.out::println);
+    //            noUse = false;
+    //            CONDITION.signal();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+             LOCK.unlock();
+        }
+    }
+
+}
+
+```
+37.3 Condition3 测试
+```java
+package com.learn.concurrenty.juc.untils.condition;
+
+import java.util.LinkedList;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ConditionExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 14:32
+ * History:
+ * @<version> 1.0
+ */
+public class ConditionExample3 {
+
+    private final static ReentrantLock LOCK = new ReentrantLock();
+    private final static Condition PRODUCE_COND = LOCK.newCondition();
+    private final static Condition CONSUME_COND = LOCK.newCondition();
+    private final static LinkedList<Long> TIMESTAMP_POOL = new LinkedList<>();
+    private final static int MAX_CAPACITY = 100;
+
+    /**
+     * @param args
+     */
+    public static void main(String[] args) {
+        IntStream.range(0, 6).boxed().forEach(ConditionExample3::beginProduce);
+        IntStream.range(0, 13).boxed().forEach(ConditionExample3::beginConsume);
+    }
+
+    private static void beginProduce(int i){
+        new Thread(()->{
+            for (;;) {
+                produce();
+                sleep(2);
+            }
+        },"-P-" + i).start();
+    }
+    private static void beginConsume(int i){
+        new Thread(()->{
+            for (;;) {
+                consumer();
+                sleep(2);
+            }
+        },"-C-" + i).start();
+    }
+
+
+    private static void produce(){
+        try {
+           LOCK.lock();
+           while (TIMESTAMP_POOL.size() >= MAX_CAPACITY){
+               PRODUCE_COND.await();
+           }
+           long value = System.currentTimeMillis();
+            System.out.println(Thread.currentThread().getName() + "-P-" + value);
+            TIMESTAMP_POOL.addLast(value);
+            CONSUME_COND.signalAll();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            LOCK.unlock();
+        }
+    }
+
+    private static void consumer(){
+        try {
+            LOCK.lock();
+            while (TIMESTAMP_POOL.isEmpty()){
+                CONSUME_COND.await();
+            }
+            //从头开始消费
+            Long value = TIMESTAMP_POOL.removeFirst();
+            System.out.println(Thread.currentThread().getName() + "-C-" + value);
+
+            PRODUCE_COND.signalAll();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            LOCK.unlock();
+        }
+    }
+
+    private static  void sleep(long sec){
+        try {
+            TimeUnit.SECONDS.sleep(sec);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+}
+
+```
+37.4 CountDownLatchExample1 测试
+```java
+package com.learn.concurrenty.juc.untils.countdownlatch;
+
+import com.learn.concurrenty.DefaultThreadFactory;
+
+import java.util.Random;
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: CountDownLatchExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/8 16:57
+ * History:
+ * @<version> 1.0
+ */
+public class CountDownLatchExample1 {
+   private static Random random = new Random(System.currentTimeMillis());
+   private static CountDownLatch countDownLatch = new CountDownLatch(10);
+   private static ExecutorService EXECUTOR_SERVICE = new ThreadPoolExecutor(2,
+            2, 200,
+            TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(6),
+            new DefaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
+
+    private static ExecutorService EXECUTOR_SERVICE_FIXED = Executors.newFixedThreadPool(2);
+
+    public static void main(String[] args) throws InterruptedException {
+        //(1)
+        int[] data = query();
+        //(2)
+        for (int i = 0; i <data.length; i++) {
+            //异步执行
+            // 什么时候countDownLatch减为零, 就是这个线程工作完了 就可以了
+            EXECUTOR_SERVICE_FIXED.execute(new SimpleRunnable(data, i, countDownLatch));
+        }
+        //(3) 这一步应该等所有动作完成才执行
+
+        // 可以使用shoutDown();但是这个只是打一个标志,
+        // 等到所有的线程都空闲了才结束
+        //EXECUTOR_SERVICE.shutdown();
+        // 也可以使用这个来配合关闭
+        //EXECUTOR_SERVICE.awaitTermination(1, TimeUnit.HOURS);
+
+        //使用CountDownLatch, 阻塞,当CountDownLatch里面的计算器数减为0 时就结束
+        countDownLatch.await();
+        System.out.println("all of work finish done.");
+        EXECUTOR_SERVICE_FIXED.shutdown();
+    }
+
+
+    static  class SimpleRunnable implements Runnable{
+
+        private final int[] data;
+
+        private final int index;
+        private final  CountDownLatch countDownLatch;
+
+        SimpleRunnable(int[] data, int index, CountDownLatch countDownLatch){
+            this.data = data;
+            this.index = index;
+            this.countDownLatch = countDownLatch;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Thread.sleep(random.nextInt(2000));
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            int value = data[index];
+            if(value % 2 == 0){
+                data[index] = value * 2;
+            }else{
+                data[index] = value * 10;
+            }
+            System.out.println(Thread.currentThread().getName()+" finished.");
+            //线程执行结束
+            countDownLatch.countDown();
+        }
+    }
+
+    private static  int[] query(){
+        return  new int[]{1, 2 ,3, 4, 5, 6, 7, 8, 9, 10};
+    }
+}
+
+```
+37.5 CountDownLatchExample4 测试
+```java
+package com.learn.concurrenty.juc.untils.countdownlatch;
+
+import com.learn.concurrenty.DefaultThreadFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: CountDownLatchExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/8 16:57
+ * History:
+ * @<version> 1.0
+ */
+public class CountDownLatchExample4 {
+   private static Random random = new Random(System.currentTimeMillis());
+
+
+   private static ExecutorService EXECUTOR_SERVICE = new ThreadPoolExecutor(5,
+            20, 200,
+            TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(20),
+            new DefaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
+
+    private static ExecutorService EXECUTOR_SERVICE_FIXED = Executors.newFixedThreadPool(5);
+
+    public static void main(String[] args)  {
+         Event[] events = {new Event(1), new Event(2)};
+        for (Event event : events) {
+            List<Table> tables = capture(event);
+            TaskGroup taskGroup = new TaskGroup(tables.size(), event);
+            for (Table table : tables) {
+                TaskBatch taskBatch = new TaskBatch(taskGroup,2);
+                TrustSourceColumns columnsRunnable = new TrustSourceColumns(table, taskBatch);
+                TrustSourceRecordCount recordCountRunnable = new TrustSourceRecordCount(table,
+                        taskBatch);
+                // 每个table 执行结束后,而且所有的记录都在 sourceColumnSchema里面去做了
+                // 并且update 只是update了一次
+                EXECUTOR_SERVICE.execute(columnsRunnable);
+                EXECUTOR_SERVICE.execute(recordCountRunnable);
+            }
+        }
+    }
+
+
+    static  class Event {
+        int id = 0;
+        Event(int id){
+            this.id = id;
+        }
+
+    }
+
+    interface Watcher{
+        /**
+         * 开始监听
+         */
+//        void startWatch();
+
+        /**
+         * 已经完成
+         * @param table
+         */
+        void done(Table table);
+    }
+
+    static class TaskBatch implements Watcher{
+
+        private  CountDownLatch countDownLatch;
+        //要知道是那个event ,那么 这里加上 TaskGroup
+        private TaskGroup taskGroup;
+
+        public  TaskBatch(TaskGroup taskGroup, int size){
+           this.taskGroup = taskGroup;
+           this.countDownLatch = new CountDownLatch(size);
+        }
+
+//        @Override
+//        public void startWatch() {
+//
+//        }
+
+        @Override
+        public void done(Table table) {
+          //如果完成一次 计算器就减一次
+          countDownLatch.countDown();
+          if(countDownLatch.getCount() == 0){
+              System.out.println("The table " + table.tableName + " finished work, " +
+                      "[" + table+"]");
+              //当event做完了,那么就是调用下 group来 看看是那个event
+              taskGroup.done(table);
+          }
+        }
+    }
+
+
+    static class TaskGroup implements Watcher{
+
+        private  CountDownLatch countDownLatch;
+
+        private Event event;
+
+        public  TaskGroup(int size, Event e){
+            this.event = e;
+            this.countDownLatch = new CountDownLatch(size);
+        }
+
+        @Override
+        public void done(Table table) {
+            countDownLatch.countDown();
+            if(countDownLatch.getCount() == 0){
+                System.out.println("===========All of  table done in event: " + event.id );
+            }
+        }
+    }
+
+
+    static  class Table {
+        String tableName;
+        long sourceRecordCount = 10;
+        long targetCount;
+        String sourceColumnSchema = "<table name='a'><column name='col1' type='varchar2'/></table>";
+        String targetColumnSchema = "";
+
+       public Table(String tableName, long sourceRecordCount){
+            this.tableName = tableName;
+            this.sourceRecordCount = sourceRecordCount;
+        }
+
+        @Override
+        public String toString() {
+            return "Table{" +
+                    "tableName='" + tableName + '\'' +
+                    ", sourceRecordCount=" + sourceRecordCount +
+                    ", targetCount=" + targetCount +
+                    ", sourceColumnSchema='" + sourceColumnSchema + '\'' +
+                    ", targetColumnSchema='" + targetColumnSchema + '\'' +
+                    '}';
+        }
+    }
+
+     private static List<Table> capture(Event event){
+        List<Table> list = new ArrayList<>();
+        int count = 10;
+         for (int i = 0; i <count ; i++) {
+             list.add(new Table("table-"+event.id+"-" + i, i*1000));
+         }
+         return list;
+     }
+
+
+    static class  TrustSourceRecordCount implements Runnable{
+        private final  Table table;
+        private final TaskBatch taskBatch;
+
+        public TrustSourceRecordCount(Table table,TaskBatch taskBatch) {
+            this.table = table;
+            this.taskBatch = taskBatch;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Thread.sleep(random.nextInt(10000));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            table.targetCount = table.sourceRecordCount;
+            //当任务执行完,那么就调用 TaskBatch中done方法
+            // 然后就减一下 计数器, 每一个都要减,
+            // 那么就将这个方法放到 TaskBatch中去 进行封装
+            taskBatch.done(table);
+//            System.out.println("The table " + table.tableName +
+//                    " target record count capture done and update the data.");
+        }
+    }
+
+
+     static class  TrustSourceColumns implements Runnable{
+        private final  Table table;
+        private final TaskBatch taskBatch;
+
+         public TrustSourceColumns(Table table, TaskBatch taskBatch) {
+             this.table = table;
+             this.taskBatch = taskBatch;
+         }
+
+         @Override
+         public void run() {
+             try {
+                 Thread.sleep(random.nextInt(10000));
+             } catch (InterruptedException e) {
+                 e.printStackTrace();
+             }
+             table.targetColumnSchema = table.sourceColumnSchema;
+             //当任务执行完,那么就调用 TaskBatch中done方法
+             // 然后就减一下 计数器, 每一个都要减,
+             // 那么就将这个方法放到 TaskBatch中去 进行封装
+             taskBatch.done(table);
+//             System.out.println("The table " + table.tableName +
+//                     " target columns capture done and update the data.");
+         }
+     }
+}
+
+```
+37.6 CyclicBarrierExample1 测试
+```java
+package com.learn.concurrenty.juc.untils.cyclibarrier;
+
+import com.learn.concurrenty.DefaultThreadFactory;
+
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: CylicBarrierExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/9 22:18
+ * History:
+ * @<version> 1.0
+ */
+public class CyclicBarrierExample1 {
+    private static ExecutorService EXECUTOR_SERVICE = new ThreadPoolExecutor(5,
+            20, 200,
+            TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(20),
+            new DefaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
+
+    public static void main(String[] args) {
+        //可以进行回调
+        final CyclicBarrier cyclicBarrier = new CyclicBarrier(2, () -> System.out.println("all of finished"));
+
+        EXECUTOR_SERVICE.execute(new MyThread("T1", cyclicBarrier));
+        EXECUTOR_SERVICE.execute(new MyThread("T2", cyclicBarrier));
+        EXECUTOR_SERVICE.shutdown();
+
+    }
+
+
+    static class MyThread extends Thread{
+        private String name;
+        private CyclicBarrier cyclicBarrier;
+
+        MyThread(String name, CyclicBarrier cyclicBarrier){
+            this.name = name;
+            this.cyclicBarrier = cyclicBarrier;
+        }
+
+        @Override
+        public void run() {
+            try {
+                TimeUnit.SECONDS.sleep(20);
+                System.out.println("T1 finished");
+                cyclicBarrier.await();
+                System.out.println("T1 the other thread finished too.");
+            } catch (InterruptedException | BrokenBarrierException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+}
+
+```
+37.7 CyclicBarrierExample2 测试
+```java
+package com.learn.concurrenty.juc.untils.cyclibarrier;
+
+import com.learn.concurrenty.DefaultThreadFactory;
+
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: CylicBarrierExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/9 22:18
+ * History:
+ * @<version> 1.0
+ */
+public class CyclicBarrierExample2 {
+
+
+    public static void main(String[] args) throws InterruptedException {
+        final CyclicBarrier cyclicBarrier = new CyclicBarrier(2 );
+
+        new Thread(){
+            @Override
+            public void run() {
+                try {
+                    TimeUnit.MILLISECONDS.sleep(5);
+                    cyclicBarrier.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+
+
+        new Thread(){
+            @Override
+            public void run() {
+                try {
+                    cyclicBarrier.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+            }
+        }.start();
+
+        TimeUnit.MILLISECONDS.sleep(6);
+        System.out.println(cyclicBarrier.getNumberWaiting());
+        System.out.println(cyclicBarrier.getParties());
+        System.out.println(cyclicBarrier.isBroken());
+        // reset 等价于 initial 等价于finished
+        cyclicBarrier.reset();
+
+
+        System.out.println(cyclicBarrier.getNumberWaiting());
+        System.out.println(cyclicBarrier.getParties());
+        System.out.println(cyclicBarrier.isBroken());
+    }
+
+}
+
+
+```
+37.8 CyclicBarrierExample3 测试
+```java
+package com.learn.concurrenty.juc.untils.cyclibarrier;
+
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * CountDownLatch VS CyclicBarrier
+ * 1、CountDownLatch不能rest, 而CyclicBarrier是可以循环使用的
+ * 2、CountDownLatch工作线程之间相互不关心， CyclicBarrier工作线程必须等到同一个共同的点才去执行某个动作
+ *
+ * @ClassName: CyclicBarrierExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/9 22:18
+ * History:
+ * @<version> 1.0
+ */
+public class CyclicBarrierExample3 {
+
+
+   static  class MyCountDownLatch extends CountDownLatch {
+       private final  Runnable runnable;
+
+       /**
+        * Constructs a {@code CountDownLatch} initialized with the given count.
+        *
+        * @param count the number of times {@link #countDown} must be invoked
+        *              before threads can pass through {@link #await}
+        * @throws IllegalArgumentException if {@code count} is negative
+        */
+       public MyCountDownLatch(int count ,Runnable runnable) {
+           super(count);
+           this.runnable = runnable;
+       }
+
+       @Override
+       public void countDown() {
+           super.countDown();
+           if(getCount() == 0){
+               this.runnable.run();
+           }
+       }
+   }
+
+    public static void main(String[] args) {
+        final  MyCountDownLatch myCountDownLatch = new MyCountDownLatch(2, new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("all of work finish done.");
+            }
+        });
+
+        new Thread(){
+            @Override
+            public void run() {
+                try {
+                    TimeUnit.SECONDS.sleep(1);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                myCountDownLatch.countDown();
+                System.out.println(Thread.currentThread()+getName() + " finished work");
+            }
+        }.start();
+
+        new Thread(){
+            @Override
+            public void run() {
+                try {
+                    TimeUnit.SECONDS.sleep(2);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                myCountDownLatch.countDown();
+                System.out.println(Thread.currentThread()+getName() + " finished work");
+            }
+        }.start();
+
+    }
+
+}
+
+
+```
+37.9 ExchangerExample1 测试
+```java
+package com.learn.concurrenty.juc.untils.exchanger;
+
+import java.util.concurrent.Exchanger;
+
+/**
+ * @ClassName: ExchangerExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 8:43
+ * History:
+ * @<version> 1.0
+ */
+public class ExchangerExample1 {
+    public static void main(String[] args) {
+        final Exchanger<String> exchanger = new Exchanger<>();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " start.");
+                try {
+                    String result = exchanger.exchange("I am come from T-A");
+                    System.out.println(Thread.currentThread().getName() + " Get value [" +result + "]");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(Thread.currentThread().getName() + " end.");
+            }
+        }, "=====A=====").start();
+
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " start.");
+                try {
+                    String result = exchanger.exchange("I am come from T-B");
+                    System.out.println(Thread.currentThread().getName() + " Get value [" +result + "]");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(Thread.currentThread().getName() + " end.");
+            }
+        }, "=====B=====").start();
+    }
+}
+
+```
+37.10 ExchangerExample2
+```java
+package com.learn.concurrenty.juc.untils.exchanger;
+
+import java.util.concurrent.Exchanger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * @ClassName: ExchangerExample2
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 8:43
+ * History:
+ * @<version> 1.0
+ */
+public class ExchangerExample2 {
+    public static void main(String[] args) {
+        final Exchanger<Integer> exchanger1 = new Exchanger<>();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                AtomicReference<Integer> value = new AtomicReference<>(1);
+                try {
+                    while (true){
+                        value.set(exchanger1.exchange(value.get()));
+                        System.out.println("Thread A has Value:"+value.get()+"");
+                        TimeUnit.SECONDS.sleep(3);
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(Thread.currentThread().getName() + " end.");
+            }
+        }, "=====A=====").start();
+
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                AtomicReference<Integer> value = new AtomicReference<>(2);
+                try {
+                    while (true){
+                        value.set(exchanger1.exchange(value.get()));
+                        System.out.println("Thread B has Value:"+value.get()+"");
+                        TimeUnit.SECONDS.sleep(2);
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(Thread.currentThread().getName() + " end.");
+            }
+        }, "=====A=====").start();
+    }
+}
+
+```
+37.11 ForkJoinTask 使用
+```java
+package com.learn.concurrenty.juc.untils.forkjoin;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.RecursiveTask;
+import java.util.stream.IntStream;
+
+/**
+ * ForkJoin  简单使用
+ * RecursiveTask
+ * @ClassName: ForkJoinRecursiveTask
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 9:41
+ * History:
+ * @<version> 1.0
+ */
+public class ForkJoinRecursiveTask {
+
+    private final  static  int MAX_THRESHOLD = 3;
+
+    public static void main(String[] args) {
+         final ForkJoinPool forkJoinPool = new ForkJoinPool();
+         // 计算 从0~10
+        ForkJoinTask<Integer> future = forkJoinPool.submit(new CalculatedRecursiveTask(0, 10));
+        try {
+            Integer result = future.get();
+            System.out.println(result);
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static class  CalculatedRecursiveTask extends RecursiveTask<Integer>{
+        private final int start;
+        private final int end;
+
+        CalculatedRecursiveTask(int start, int end){
+            this.start = start;
+            this.end = end;
+        }
+        /**
+         * The main computation performed by this task.
+         *
+         * @return the result of the computation
+         */
+        @Override
+        protected Integer compute() {
+            if(end - start <= MAX_THRESHOLD){
+                //如果这个 区间的数据相减 没有超过这个 MAX_THRESHOLD 范围，那么就不在进行任务拆分了
+                return IntStream.rangeClosed(start, end).sum();
+            }else {
+                // 如果自己忙不过来，那么就将任务拆分 请其他的人帮忙
+                int middle = (start + end) / 2;
+                // 左边的任务
+                CalculatedRecursiveTask leftTask = new CalculatedRecursiveTask(start, middle);
+                //右边的任务 从middle +1 开始
+                CalculatedRecursiveTask rightTask = new CalculatedRecursiveTask(middle + 1, end);
+
+                leftTask.fork();
+                rightTask.fork();
+                return  leftTask.join() + rightTask.join();
+            }
+        }
+    }
+}
+
+```
+37.12 CalculatedRecursiveAction 使用
+```java
+package com.learn.concurrenty.juc.untils.forkjoin;
+
+import java.util.Optional;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+
+/**
+ * 实现拿出最终的结果，那么必须有一个统一记录的地方
+ * @ClassName: ForkJoinRecursiveAction
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 10:19
+ * History:
+ * @<version> 1.0
+ */
+public class ForkJoinRecursiveAction {
+    private final  static  int MAX_THRESHOLD = 3;
+
+    private final  static AtomicInteger SUM = new AtomicInteger(0);
+
+    public static void main(String[] args) throws InterruptedException {
+        final ForkJoinPool forkJoinPool = new ForkJoinPool();
+        // 返回是拿不到值 ，因为是void
+        forkJoinPool.submit(new CalculatedRecursiveAction(0, 10));
+
+        forkJoinPool.awaitTermination(10, TimeUnit.SECONDS);
+        Optional.of(SUM).ifPresent(System.out::println);
+    }
+
+    /**
+     * RecursiveAction 的compute 方法是没有返回值的，
+     * 所以想要有放回值那么就使用一个累加器来处理
+     */
+    private static class  CalculatedRecursiveAction extends RecursiveAction {
+        private final int start;
+        private final int end;
+
+        CalculatedRecursiveAction(int start, int end){
+            this.start = start;
+            this.end = end;
+        }
+        /**
+         * not return
+         * The main computation performed by this task.
+         */
+        @Override
+        protected void compute() {
+            //将结果放到一个累加器中去
+            if(end - start <= MAX_THRESHOLD){
+                SUM.addAndGet(IntStream.rangeClosed(start, end).sum());
+            }else {
+                // 如果自己忙不过来，那么就将任务拆分 请其他的人帮忙
+                int middle = (start + end) / 2;
+                // 左边的任务
+                CalculatedRecursiveAction leftActon = new CalculatedRecursiveAction(start, middle);
+                //右边的任务 从middle +1 开始
+                CalculatedRecursiveAction rightActon = new CalculatedRecursiveAction(middle + 1, end);
+
+                leftActon.fork();
+                rightActon.fork();
+            }
+
+        }
+    }
+}
+
+```
+37.13 ReadWriteLockExample
+```java
+package com.learn.concurrenty.juc.untils.locks;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * 读写锁
+ * @ClassName: ReadWriteLockExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 14:12
+ * History:
+ * @<version> 1.0
+ */
+public class ReadWriteLockExample {
+    private final static ReentrantLock LOCK = new ReentrantLock(true);
+    private final static List<Long> data = new ArrayList<>();
+
+    /**
+     * Write Write  x
+     * Write Read   x
+     * Read  Write  x
+     * Read  Read   ok
+     *
+     * 读写分离锁
+     * @param args
+     */
+    public static void main(String[] args) throws InterruptedException {
+        Thread t1 = new Thread(ReadWriteLockExample::write);
+        t1.start();
+        TimeUnit.SECONDS.sleep(1);
+
+        Thread t2 = new Thread(ReadWriteLockExample::read);
+        t2.start();
+        TimeUnit.SECONDS.sleep(1);
+    }
+
+    public static void  write(){
+        try {
+            LOCK.lock();
+            data.add(System.currentTimeMillis());
+            //为了模拟写数据比较耗时，那么就让其睡 几秒
+            TimeUnit.SECONDS.sleep(5);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            LOCK.unlock();
+        }
+    }
+
+    public static void  read(){
+        try {
+            LOCK.lock();
+            data.forEach(System.out::println);
+            //为了模拟写数据比较耗时，那么就让其睡 几秒
+            // 同样读数据也是一样，让其睡几秒
+            TimeUnit.SECONDS.sleep(5);
+            System.out.println(Thread.currentThread().getName() + "============");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            LOCK.unlock();
+        }
+    }
+
+}
+
+```
+37.14 ReadWriteLockExample1
+```java
+package com.learn.concurrenty.juc.untils.locks;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+/**
+ * 读写锁
+ * @ClassName: ReadWriteLockExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 14:12
+ * History:
+ * @<version> 1.0
+ */
+public class ReadWriteLockExample1 {
+    private final static ReentrantReadWriteLock READ_WRITE_LOCK = new ReentrantReadWriteLock(true);
+    private final static Lock READ_LOCK = READ_WRITE_LOCK.readLock();
+    private final static Lock WRITE_LOCK = READ_WRITE_LOCK.writeLock();
+    private final static List<Long> data = new ArrayList<>();
+
+    /**
+     * Write Write  x
+     * Write Read   x
+     * Read  Write  x
+     * Read  Read   ok
+     *
+     * @param args
+     */
+    public static void main(String[] args) {
+
+    }
+
+    public static void  write(){
+        try {
+            WRITE_LOCK.lock();
+            data.add(System.currentTimeMillis());
+            //为了模拟写数据比较耗时，那么就让其睡 几秒
+            TimeUnit.SECONDS.sleep(5);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            WRITE_LOCK.unlock();
+        }
+    }
+
+    public static void  read(){
+        try {
+            READ_LOCK.lock();
+            data.forEach(System.out::println);
+            //为了模拟写数据比较耗时，那么就让其睡 几秒
+            // 同样读数据也是一样，让其睡几秒
+            TimeUnit.SECONDS.sleep(5);
+            System.out.println(Thread.currentThread().getName() + "============");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            READ_LOCK.unlock();
+        }
+    }
+
+}
+
+```
+37.14 ReentrantLockExample 使用
+```java
+package com.learn.concurrenty.juc.untils.locks;
+
+
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * @ClassName: ReentrantLockExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 11:12
+ * History:
+ * @<version> 1.0
+ */
+public class ReentrantLockExample {
+    private static final ReentrantLock lock = new ReentrantLock();
+    public static void main(String[] args) throws InterruptedException {
+//        IntStream.range(0, 2).forEach(i ->
+//                new Thread(ReentrantLockExample::needLock).start());
+
+//        Thread t1 = new Thread(ReentrantLockExample::testUnlockInterrupt);
+//        t1.start();
+//        TimeUnit.SECONDS.sleep(1);
+//
+//        Thread t2 = new Thread(ReentrantLockExample::testUnlockInterrupt);
+//        t2.start();
+//        TimeUnit.SECONDS.sleep(1);
+//
+//        t2.interrupt();
+//        System.out.println("==================");
+
+//        Thread t1 = new Thread(ReentrantLockExample::testTryLock);
+//        t1.start();
+//        TimeUnit.SECONDS.sleep(1);
+//
+//        Thread t2 = new Thread(ReentrantLockExample::testTryLock);
+//        t2.start();
+
+         Thread t1 = new Thread(ReentrantLockExample::testUnlockInterrupt);
+         t1.start();
+         TimeUnit.SECONDS.sleep(1);
+
+         Thread t2 = new Thread(ReentrantLockExample::testUnlockInterrupt);
+         t2.start();
+         TimeUnit.SECONDS.sleep(1);
+         Optional.of(lock.getQueueLength()).ifPresent(System.out::println);
+         Optional.of(lock.hasQueuedThreads()).ifPresent(System.out::println);
+         //这个方法表示 那个线程被放到了 阻塞队列中去
+         Optional.of(lock.hasQueuedThread(t2)).ifPresent(System.out::println);
+         Optional.of(lock.hasQueuedThread(t1)).ifPresent(System.out::println);
+    }
+
+
+    public static void testTryLock(){
+        //尝试获取锁，如果没有获取到锁，那么就退出锁的竞争了
+        if(lock.tryLock()){
+            try {
+                Optional.of("The thread-" + Thread.currentThread().getName()
+                        + " get lock and will do working")
+                        .ifPresent(System.out::println);
+                while (true){}
+            }finally {
+                lock.unlock();
+            }
+        }
+        else {
+            Optional.of("The thread-" + Thread.currentThread().getName()
+                    + " not get lock. ")
+                    .ifPresent(System.out::println);
+        }
+
+    }
+
+
+    public static void testUnlockInterrupt(){
+        try {
+            // 抢锁，如果抢不到锁那么其他线程可以被其他线程打断。
+            lock.lockInterruptibly();
+            Optional.of(Thread.currentThread().getName() + ":" + lock.getHoldCount())
+            .ifPresent(System.out::println);
+            Optional.of("The thread-" + Thread.currentThread().getName()
+                    + " get lock and will do working")
+                    .ifPresent(System.out::println);
+           while (true){
+           }
+        }catch (InterruptedException e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+
+
+    public  static  void needLock(){
+        lock.lock();
+        try {
+            Optional.of("The thread-" + Thread.currentThread().getName() + " get lock and will do working")
+            .ifPresent(System.out::println);
+            TimeUnit.SECONDS.sleep(10);
+        }catch (InterruptedException e){
+            e.printStackTrace();
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    public static void  needLockBySync(){
+        synchronized (ReentrantLockExample.class){
+            try {
+                TimeUnit.SECONDS.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+```
+37.15 StampedLockExample 使用
+```java
+package com.learn.concurrenty.juc.untils.locks;
+
+import com.learn.concurrenty.DefaultThreadFactory;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.StampedLock;
+import java.util.stream.Collectors;
+
+/**
+ * @ClassName: StampedLockExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 16:43
+ * History:
+ * @<version> 1.0
+ */
+public class StampedLockExample {
+    private static final StampedLock lock = new StampedLock();
+    private final static List<Long> DATA = new ArrayList<>();
+    private static ExecutorService executor =new ThreadPoolExecutor(5,
+            20, 200,
+            TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(120),
+            new DefaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
+    public static void main(String[] args) {
+
+       Runnable readTask = ()->{
+            for (;;){
+                read();
+            }
+        };
+
+        Runnable writeTask = ()->{
+            for (;;){
+                writed();
+            }
+        };
+
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(writeTask);
+    }
+
+
+    /**
+     * 悲观的去读
+     */
+    private static void read(){
+        long stamped = -1;
+        try {
+            stamped = lock.readLock();
+            Optional.of(
+            DATA.stream().map(String::valueOf).
+                    collect(Collectors.joining("#","R-",""))
+            ).ifPresent(System.out::println);
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+           lock.unlockRead(stamped);
+        }
+    }
+
+    private static void writed(){
+        long stamped = -1;
+        try {
+            stamped = lock.writeLock();
+             DATA.add(System.currentTimeMillis());
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlockWrite(stamped);
+        }
+    }
+
+}
+
+```
+37.16 StampedLockExample2 使用
+```java
+package com.learn.concurrenty.juc.untils.locks;
+
+import com.learn.concurrenty.DefaultThreadFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.StampedLock;
+import java.util.stream.Collectors;
+
+/**
+ * @ClassName: StampedLockExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 16:43
+ * History:
+ * @<version> 1.0
+ */
+public class StampedLockExample2 {
+    private static final StampedLock lock = new StampedLock();
+    private final static List<Long> DATA = new ArrayList<>();
+    private static ExecutorService executor =new ThreadPoolExecutor(5,
+            20, 200,
+            TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(120),
+            new DefaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
+    public static void main(String[] args) {
+
+       Runnable readTask = ()->{
+            for (;;){
+                read();
+            }
+        };
+
+        Runnable writeTask = ()->{
+            for (;;){
+                writed();
+            }
+        };
+
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(readTask);
+        executor.submit(writeTask);
+    }
+
+
+    /**
+     * 乐观的去读
+     */
+    private static void read(){
+        // 这是一个乐观锁，他这个拿的时候是不会被阻塞住的。
+        // 这个是一个戳，如果有改变那么就会判断
+        long stamped = lock.tryOptimisticRead();
+        // 检查是否在修改
+        if(lock.validate(stamped)){
+            try {
+                stamped = lock.readLock();
+                System.out.println(stamped);
+                Optional.of(
+                        DATA.stream().map(String::valueOf).collect(Collectors.joining("#","R-",""))
+                ).ifPresent(System.out::println);
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                lock.unlockRead(stamped);
+            }
+        }
+
+    }
+
+    private static void writed(){
+        long stamped = -1;
+        try {
+            stamped = lock.writeLock();
+             DATA.add(System.currentTimeMillis());
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlockWrite(stamped);
+        }
+    }
+}
+
+```
+38.1 Phaser 使用
+```java
+package com.learn.concurrenty.juc.untils.phaser;
+
+import java.util.Random;
+import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: PhaserExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class PhaserExample {
+    private final static Random RANDOM = new Random(System.currentTimeMillis());
+
+    public static void main(String[] args) {
+        final Phaser phaser = new Phaser();
+        IntStream.rangeClosed(1, 5).boxed().map(i -> phaser).forEach(Task::new);
+
+        // 将main线程 也注册进去
+        phaser.register();
+        //让main线程也 到达等待前行
+        phaser.arriveAndAwaitAdvance();
+        System.out.println("all of worker finished the task.");
+    }
+
+
+    static  class Task extends  Thread{
+        private final Phaser phaser;
+
+        Task(Phaser phaser){
+            this.phaser = phaser;
+            //在运行的时候 动态的去加，这个就不像CyclicBarrier一样 构造时候必须放进去
+            this.phaser.register();
+            start();
+        }
+
+        @Override
+        public void run() {
+            System.out.println("The Worker ["+ getName() +"] is working....");
+
+            try {
+                TimeUnit.SECONDS.sleep(RANDOM.nextInt(5));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            phaser.arriveAndAwaitAdvance();
+        }
+    }
+}
+
+```
+38.2 PhaserExample2 使用
+```java
+package com.learn.concurrenty.juc.untils.phaser;
+
+import java.util.Random;
+import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @ClassName: PhaserExample2
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class PhaserExample2 {
+    private final static Random RANDOM = new Random(System.currentTimeMillis());
+
+    /**
+     *
+     * @param args
+     */
+    public static void main(String[] args) {
+        final Phaser phaser = new Phaser(5);
+        int count = 6;
+        //从1号运动员开始
+        for (int i = 1; i < count; i++) {
+            new Athletes(i, phaser).start();
+        }
+    }
+
+    /**
+     * 比如运动员
+     * 三项比赛
+     */
+    static  class Athletes extends  Thread{
+        //几号运动员
+        private final int  no;
+        private final Phaser phaser;
+
+        Athletes(int no, Phaser phaser){
+            this.no = no;
+            this.phaser = phaser;
+        }
+
+        @Override
+        public void run() {
+            try {
+                System.out.println(no + ": start running....");
+                TimeUnit.SECONDS.sleep(RANDOM.nextInt(5));
+                System.out.println(no + ": end   running....");
+                System.out.println("getPhase()==>" + phaser.getPhase());
+                phaser.arriveAndAwaitAdvance();
+
+
+                System.out.println(no + ": start bicycle....");
+                TimeUnit.SECONDS.sleep(RANDOM.nextInt(5));
+                System.out.println(no + ": end   bicycle....");
+                System.out.println("getPhase()==>" + phaser.getPhase());
+                phaser.arriveAndAwaitAdvance();
+
+                System.out.println(no + ": start jump....");
+                TimeUnit.SECONDS.sleep(RANDOM.nextInt(5));
+                System.out.println(no + ": end   jump....");
+                System.out.println("getPhase()==>" + phaser.getPhase());
+                phaser.arriveAndAwaitAdvance();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+```
+38.3 PhaserExample3 使用
+```java
+package com.learn.concurrenty.juc.untils.phaser;
+
+import java.util.Random;
+import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @ClassName: PhaserExample3
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class PhaserExample3 {
+    private final static Random RANDOM = new Random(System.currentTimeMillis());
+
+    /**
+     *
+     * @param args
+     */
+    public static void main(String[] args) {
+        // 动态的增加或者减少
+        final Phaser phaser = new Phaser(5);
+        int count = 5;
+        //从1号运动员开始
+        for (int i = 1; i < count; i++) {
+            new Athletes(i, phaser).start();
+        }
+        // 有点运动员在 运动中受伤，那么就不能继续比赛了
+        new InjureAthletes(5, phaser).start();
+    }
+
+    /**
+     * 比如运动员
+     * 三项比赛
+     */
+    static  class Athletes extends  Thread{
+        //几号运动员
+        private final int  no;
+        private final Phaser phaser;
+
+        Athletes(int no, Phaser phaser){
+            this.no = no;
+            this.phaser = phaser;
+        }
+
+        @Override
+        public void run() {
+            try {
+                sport(phaser, no + ": start running....", no + ": end   running....");
+
+                sport(phaser, no + ": start bicycle....", no + ": end   bicycle....");
+
+                sport(phaser, no + ": start jump....", no + ": end   jump....");
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
+
+
+    /**
+     * 运动员 有的在中途中受伤 不能继续比赛了
+     */
+    static  class InjureAthletes extends  Thread{
+        //几号运动员
+        private final int  no;
+        private final Phaser phaser;
+
+        InjureAthletes(int no, Phaser phaser){
+            this.no = no;
+            this.phaser = phaser;
+        }
+
+        @Override
+        public void run() {
+            try {
+                sport(phaser, no + ": start running....", no + ": end   running....");
+
+                sport(phaser, no + ": start bicycle....", no + ": end   bicycle....");
+
+                System.out.println("oh shit, I am injured, i will be exited");
+                // 退出注册
+                phaser.arriveAndDeregister();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    private  static void sport(Phaser phaser, String x, String y) throws InterruptedException {
+        System.out.println(x);
+        TimeUnit.SECONDS.sleep(RANDOM.nextInt(5));
+        System.out.println(y);
+        phaser.arriveAndAwaitAdvance();
+    }
+}
+
+```
+38.4 PhaserExample4 使用
+```java
+package com.learn.concurrenty.juc.untils.phaser;
+
+import java.util.Random;
+import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @ClassName: PhaserExample3
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class PhaserExample4 {
+    private final static Random RANDOM = new Random(System.currentTimeMillis());
+
+    /**
+     *
+     * @param args
+     */
+    public static void main(String[] args) throws InterruptedException {
+        // 动态的增加或者减少
+//        final Phaser phaser = new Phaser(1);
+        /*  System.out.println(phaser.getPhase());
+        phaser.arriveAndAwaitAdvance();
+        System.out.println(phaser.getPhase());
+
+        phaser.arriveAndAwaitAdvance();
+        System.out.println(phaser.getPhase());
+
+        phaser.arriveAndAwaitAdvance();
+        System.out.println(phaser.getPhase());*/
+
+         /* System.out.println(phaser.getRegisteredParties());
+          phaser.register();
+          System.out.println(phaser.getRegisteredParties());
+          phaser.register();
+          System.out.println(phaser.getRegisteredParties());*/
+
+         /*System.out.println(phaser.getArrivedParties());
+         System.out.println(phaser.getUnarrivedParties());*/
+
+
+         // 批量register
+         /*phaser.bulkRegister(10);
+         System.out.println(phaser.getRegisteredParties());
+         System.out.println(phaser.getArrivedParties());
+         System.out.println(phaser.getUnarrivedParties());
+         new Thread(phaser::arriveAndAwaitAdvance).start();
+         TimeUnit.SECONDS.sleep(1);
+         System.out.println("======================");
+         System.out.println(phaser.getRegisteredParties());
+         System.out.println(phaser.getArrivedParties());
+         System.out.println(phaser.getUnarrivedParties());
+         */
 
 
 
-40. 跳表的技术特点
+
+        // 动态的增加或者减少
+        final Phaser phaser = new Phaser(2){
+            /**
+             */
+            @Override
+            protected boolean onAdvance(int phase, int registeredParties) {
+                return true;
+            }
+        };
+        new OnAdvanceTask("Alex", phaser).start();
+        new OnAdvanceTask("jack", phaser).start();
+        TimeUnit.SECONDS.sleep(2);
+        System.out.println(phaser.getUnarrivedParties());
+        System.out.println(phaser.getArrivedParties());
+    }
+
+    /**
+     * 比如运动员
+     * 三项比赛
+     */
+    static  class OnAdvanceTask extends  Thread{
+        private final Phaser phaser;
+
+        OnAdvanceTask(String name, Phaser phaser){
+            super(name);
+            this.phaser = phaser;
+        }
+
+        @Override
+        public void run() {
+          System.out.println(getName() + " I am start and the phase" + phaser.getPhase());
+          phaser.arriveAndAwaitAdvance();
+          System.out.println(getName() + " I am end!");
+
+            try {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            if("Alex".equals(getName())){
+                System.out.println(getName() + " I am start and the phase" + phaser.getPhase());
+                phaser.arriveAndAwaitAdvance();
+                System.out.println(getName() + " I am end!");
+            }
+        }
+
+    }
+}
+
+```
+38.5 PhaserExample5 
+```java
+package com.learn.concurrenty.juc.untils.phaser;
+
+import java.util.Random;
+import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: PhaserExample5
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class PhaserExample5 {
+
+    /**
+     *
+     * @param args
+     */
+    public static void main(String[] args) throws InterruptedException {
+        // 动态的增加或者减少
+        final Phaser phaser = new Phaser(7);
+
+        // 这里只有6个线程去做，但是 有7个所以 就会造成block
+        IntStream.rangeClosed(0, 5).boxed().map(i->phaser).forEach(AwaitAdvanceTask::new);
+        // 如果结束了就会从block中退出来，如果没有结束那么就会block住
+        phaser.awaitAdvance(phaser.getPhase());
+        System.out.println("======================");
+
+    }
+
+    private static  class  AwaitAdvanceTask extends Thread{
+
+        private final Phaser phaser;
+
+        private  AwaitAdvanceTask(Phaser phaser){
+            this.phaser = phaser;
+        }
+
+        @Override
+        public void run() {
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            phaser.arriveAndAwaitAdvance();
+            System.out.println(getName() + " finished work.");
+        }
+    }
+
+}
+
+```
+38.6 PhaserExample6 测试
+```java
+package com.learn.concurrenty.juc.untils.phaser;
+
+import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * @ClassName: PhaserExample6
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class PhaserExample6 {
+
+    /**
+     *
+     * @param args
+     */
+    public static void main(String[] args) throws InterruptedException {
+        // 动态的增加或者减少
+
+
+//        final Phaser phaser = new Phaser(7);
+        /*Thread thread = new Thread(()->{
+            try {
+                // 这里会一直等，只有别人调用了interrupt 将其打断才会退出
+                phaser.awaitAdvanceInterruptibly(phaser.getPhase());
+                System.out.println("***********************");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        thread.start();
+
+        System.out.println("======================");
+        TimeUnit.SECONDS.sleep(10);
+        thread.interrupt();
+        System.out.println("=======thread.interrupt===============");*/
+
+
+        //=========================================
+        /*
+        final Phaser phaser = new Phaser(7);
+        Thread thread = new Thread(()->{
+            try {
+                // 这里会一直等，只有别人调用了interrupt 将其打断才会退出
+                phaser.awaitAdvanceInterruptibly(10);
+                System.out.println("***********************");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+        thread.start();
+
+        System.out.println("======================");
+        TimeUnit.SECONDS.sleep(10);
+        thread.interrupt();
+        System.out.println("=======thread.interrupt===============");*/
+
+
+        final Phaser phaser = new Phaser(3);
+        Thread thread = new Thread(()->{
+            try {
+                // 最多等待10秒钟，如果十秒钟没有完成，那么就不等了
+                phaser.awaitAdvanceInterruptibly(0, 10 ,TimeUnit.SECONDS);
+                System.out.println("***********************");
+            } catch (InterruptedException | TimeoutException e) {
+                e.printStackTrace();
+            }
+        });
+
+        thread.start();
+
+    }
+
+    private static  class  AwaitAdvanceTask extends Thread{
+
+        private final Phaser phaser;
+
+        private  AwaitAdvanceTask(Phaser phaser){
+            this.phaser = phaser;
+        }
+
+        @Override
+        public void run() {
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            phaser.arriveAndAwaitAdvance();
+            System.out.println(getName() + " finished work.");
+        }
+    }
+
+}
+
+```
+38.7 PhaserExample7 测试
+```java
+package com.learn.concurrenty.juc.untils.phaser;
+
+import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * @ClassName: PhaserExample3
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/11 11:16
+ * History:
+ * @<version> 1.0
+ */
+public class PhaserExample7 {
+
+    /**
+     *
+     * @param args
+     */
+    public static void main(String[] args) throws InterruptedException {
+        final Phaser phaser = new Phaser(3);
+        new Thread(phaser::arriveAndAwaitAdvance).start();
+
+        TimeUnit.SECONDS.sleep(3);
+        System.out.println(phaser.isTerminated());
+
+        // 销毁 不会再等待
+        phaser.forceTermination();
+        System.out.println(phaser.isTerminated());
+    }
+
+}
+
+```
+39.1 SemaphoreExample 测试
+```java
+package com.learn.concurrenty.juc.untils.semaphore;
+
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @ClassName: SemaphoreExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 9:30
+ * History:
+ * @<version> 1.0
+ */
+public class SemaphoreExample {
+    public static void main(String[] args) {
+         final  SemaphoreLock lock = new SemaphoreLock();
+         new Thread(){
+             @Override
+             public void run() {
+                 try {
+                     System.out.println(Thread.currentThread().getName()+" is running");
+                     lock.lock();
+                     System.out.println(Thread.currentThread().getName()+" get the #SemaphoreLock");
+                     TimeUnit.SECONDS.sleep(10);
+                 } catch (InterruptedException e) {
+                     e.printStackTrace();
+                 }finally {
+                     lock.unlock();
+                 }
+                 System.out.println(Thread.currentThread().getName()+" Released #SemaphoreLock");
+             }
+         }.start();
+    }
+
+    static class  SemaphoreLock{
+        private final Semaphore semaphore = new Semaphore(1);
+
+        public  void lock() throws InterruptedException {
+            //申请一个许可证
+            semaphore.acquire();
+        }
+
+        public void unlock(){
+            semaphore.release();
+        }
+    }
+}
+
+```
+39.2 SemaphoreExample2
+```java
+package com.learn.concurrenty.juc.untils.semaphore;
+
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @ClassName: SemaphoreExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 9:30
+ * History:
+ * @<version> 1.0
+ */
+public class SemaphoreExample2 {
+    public static void main(String[] args) {
+         final  Semaphore semaphore = new Semaphore(1);
+         int count =2;
+        for (int i = 0; i <count ; i++) {
+            new Thread(){
+                @Override
+                public void run() {
+                    try {
+                        System.out.println(Thread.currentThread().getName()+" in");
+                        semaphore.acquire();
+                        System.out.println(Thread.currentThread().getName()+" Get the #Semaphore");
+                        TimeUnit.SECONDS.sleep(5);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }finally {
+                        semaphore.release();
+                    }
+                    System.out.println(Thread.currentThread().getName()+" out");
+                }
+            }.start();
+        }
+    }
+
+}
+
+```
+39.3 SemaphoreExample3
+```java
+package com.learn.concurrenty.juc.untils.semaphore;
+
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+/**
+ *
+ * @ClassName: SemaphoreExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 9:30
+ * History:
+ * @<version> 1.0
+ */
+public class SemaphoreExample3 {
+    public static void main(String[] args) throws InterruptedException {
+         final  Semaphore semaphore = new Semaphore(1);
+        Thread t1 = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    semaphore.acquire();
+                    TimeUnit.SECONDS.sleep(5);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    semaphore.release();
+                }
+                System.out.println("T1 finished");
+            }
+        };
+        t1.start();
+
+        TimeUnit.MICROSECONDS.sleep(50);
+
+        // 因为只有一个 许可证, 被线程t1拿到了，所以去拿取拿不到
+        // 如果拿取不到 那么想放弃去拿取 怎么办喃。
+        Thread t2 = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    semaphore.acquire();
+                    // 这个方法没有中断，也是说你中断它，他也不会有什么提示
+                    //semaphore.acquireUninterruptibly();
+//                    TimeUnit.SECONDS.sleep(5);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    semaphore.release();
+                }
+                System.out.println("T2 finished");
+            }
+        };
+        t2.start();
+
+        TimeUnit.MICROSECONDS.sleep(50);
+        // 如果拿取不到那么就中断下
+        t2.interrupt();
+
+    }
+}
+
+```
+39.4 SemaphoreExample4
+```java
+package com.learn.concurrenty.juc.untils.semaphore;
+
+import java.util.Collection;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+/**
+ *
+ * @ClassName: SemaphoreExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/10 9:30
+ * History:
+ * @<version> 1.0
+ */
+public class SemaphoreExample4 {
+    public static void main(String[] args) throws InterruptedException {
+//        final  Semaphore semaphore = new Semaphore(5);
+        final  MySemaphore semaphore = new MySemaphore(5);
+        Thread t1 = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    // 这个方法的意思 是获取完许可证
+                    semaphore.drainPermits();
+                    System.out.println(semaphore.availablePermits());
+                    TimeUnit.SECONDS.sleep(5);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    semaphore.release(5);
+                }
+                System.out.println("T1 finished");
+            }
+        };
+        t1.start();
+
+        TimeUnit.MICROSECONDS.sleep(1);
+
+
+        Thread t2 = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    semaphore.acquire();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    semaphore.release();
+                }
+                System.out.println("T2 finished");
+            }
+        };
+        t2.start();
+
+        TimeUnit.SECONDS.sleep(1);
+        System.out.println("===" +semaphore.hasQueuedThreads());
+        Collection<Thread> waitingThread = semaphore.getWaitingThreads();
+        for (Thread t : waitingThread) {
+            System.out.println("waitingThread========="+t);
+        }
+    }
+
+
+    static class MySemaphore extends Semaphore{
+
+        public MySemaphore(int permits) {
+            super(permits);
+        }
+
+        public MySemaphore(int permits, boolean fair) {
+            super(permits, fair);
+        }
+
+        public Collection<Thread> getWaitingThreads(){
+            return super.getQueuedThreads();
+        }
+    }
+
+}
+
+```
+40. ThreadPoolExecutorBuild
+```java
+package com.learn.concurrenty.juc.untils.threadpool;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * @ClassName: ThreadPoolExecutorBuild
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/12 22:30
+ * History:
+ * @<version> 1.0
+ */
+public class ThreadPoolExecutorBuild {
+    public static void main(String[] args) {
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor) buildThreadPoolExecutor();
+        int activeCount = -1;
+        int queueSize = -1;
+        while (true){
+            if(activeCount != executorService.getActiveCount() || queueSize!=executorService.getQueue().size()) {
+                System.out.println(executorService.getActiveCount());
+                System.out.println(executorService.getCorePoolSize());
+                System.out.println(executorService.getQueue());
+                System.out.println(executorService.getMaximumPoolSize());
+                activeCount = executorService.getActiveCount();
+                queueSize = executorService.getQueue().size();
+                System.out.println("==================================");
+            }
+        }
+    }
+
+    /**
+     * Test point.
+     *
+     * 1.coreSize=1, MaxSize=2 blockingQueue is empty. what happen when submit 3 task?
+     * 2.coreSize=1, MaxSize=2 blockingQueue size=5 what happen when submit 7 task?
+     * 3.coreSize=1, MaxSize=2 blockingQueue size=5 what happen when submit 8 task?
+     *
+     * int corePoolSize,
+     * int maximumPoolSize,
+     * long keepAliveTime,
+     * TimeUnit unit,
+     * BlockingQueue<Runnable> workQueue,
+     * ThreadFactory threadFactory,
+     * RejectedExecutionHandler handler
+     */
+    private  static  ExecutorService  buildThreadPoolExecutor(){
+        ExecutorService executorService = new ThreadPoolExecutor(1, 2, 30, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(1), r->{
+            Thread t = new Thread(r);
+            return t;
+        }, new ThreadPoolExecutor.AbortPolicy());
+        System.out.println("The ThreadPoolExecutor create done.");
+
+        executorService.execute(()->sleepSeconds(100));
+        executorService.execute(()->sleepSeconds(10));
+        executorService.execute(()->sleepSeconds(100));
+        return  executorService;
+    }
+
+    private  static  void sleepSeconds(long seconds){
+        try {
+            System.out.println("* " + Thread.currentThread().getName() + " *");
+            TimeUnit.SECONDS.sleep(seconds);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+```
+40.1 ThreadPoolExecutorTask
+```java
+package com.learn.concurrenty.juc.untils.threadpool;
+
+import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ThreadPoolExecutorTask
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/12 22:30
+ * History:
+ * @<version> 1.0
+ */
+public class ThreadPoolExecutorTask {
+    public static void main(String[] args) {
+        ExecutorService executorService = new ThreadPoolExecutor(10, 20, 30, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(10), r->{
+            Thread t = new Thread(r);
+            return t;
+        }, new ThreadPoolExecutor.AbortPolicy());
+
+        IntStream.range(0, 20).boxed().forEach(i -> executorService.execute(()->{
+            try {
+                TimeUnit.SECONDS.sleep(10);
+                System.out.println(Thread.currentThread().getName() + " [" + i + "] finish done.");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }));
+
+        List<Runnable> runnableList = null;
+        try {
+            runnableList = executorService.shutdownNow();
+            System.out.println("===================over======================");
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        System.out.println("======================over==========================");
+        System.out.println(runnableList);
+        System.out.println(runnableList.size());
+
+        /**
+         * shutdown
+         * 20 threads
+         *    10 threads work
+         *    10 idle(空闲)
+         *
+         * showdown invoked
+         * 1. 10 waiting to finished the work
+         * 2. 10 interrupt the idle works
+         * 3. 20 idle threads will exist
+         *
+         * shutdownNow
+         * 10  thread queue elements 10
+         * 10  running
+         * 10  stored in the blocking queue
+         *
+         * 1.return list<Runnable> remain 10 un handle runnable
+         *
+         * 2.interrupted all of threads in the pool
+         */
+    }
+
+}
+
+```
+41.1 线程池相关 CompletableFutureExample1
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.*;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: CompletableFutureExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/15 16:15
+ * History:
+ * @<version> 1.0
+ */
+public class CompletableFutureExample1 {
+    public static void main(String[] args) throws InterruptedException {
+
+        // 因为这里写在了main方法里， 并且CompletableFuture
+        // 里面会将其设置为守护线程.
+       /* CompletableFuture.runAsync(()->{
+            try {
+                TimeUnit.SECONDS.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            // 执行完返回结果
+            // 注册一个callback
+        }).whenComplete((v, t) -> System.out.println("DONE"));
+        System.out.println("=========i am not blocked=============");*/
+
+
+
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        // 一个阶段 一个阶段的执行
+        // 定义了一组callable
+       /* List<Callable<Integer>> tasks = IntStream.range(0, 10).boxed()
+                .map(i -> (Callable<Integer>) () -> get()).collect(Collectors.toList());
+        //executorService 提交了一批的 callable 然后将结果拿出来
+        executorService.invokeAll(tasks).stream().map(future ->{
+            try {
+                // future 分别将值提取出来
+               return future.get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw  new RuntimeException(e);
+            }
+        }).parallel().forEach(CompletableFutureExample1::display);*/
+
+
+        /**
+         * 使用CompletableFuture
+         * CompletableFuture 是future和 ExecutorService的结合
+         *
+         */
+        IntStream.range(0, 10).boxed()
+                // 执行是交替执行, 不想上面的一批执行完后再执行下一批
+                // 并行的执行
+                .forEach(i -> CompletableFuture.supplyAsync(CompletableFutureExample1::get)
+                .thenAccept(CompletableFutureExample1::display)
+                //执行结束之后
+                .whenComplete((v, t) -> System.out.println(i + " DONE")));
+        Thread.currentThread().join();
+    }
+
+    private static  void display(int data ){
+        int value = ThreadLocalRandom.current().nextInt(20);
+        try {
+            System.out.println(Thread.currentThread().getName() + " display will be sleep " + value);
+            TimeUnit.SECONDS.sleep(value);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println(Thread.currentThread().getName() +
+                " display execute done " + data);
+    }
+
+
+
+    private static  int get(){
+        int value = ThreadLocalRandom.current().nextInt(20);
+        try {
+            System.out.println(Thread.currentThread().getName() + " will be sleep " + value);
+            TimeUnit.SECONDS.sleep(value);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println(Thread.currentThread().getName() + " execute done " + value);
+        return  value;
+    }
+
+}
+
+```
+41.2  CompletableFutureExample2 学习
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.*;
+import java.util.function.Supplier;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: CompletableFutureExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/15 16:15
+ * History:
+ * @<version> 1.0
+ */
+public class CompletableFutureExample2 {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
+       //supplyAsync();
+       // hello 没有输出 是因为 线程是守护线程 , 所以使用join来等待期线程执行后
+       //Thread.currentThread().join();
+
+        //=====
+        //Future<?> future = runAsync();
+        //future.get();
+
+        System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>"+anyOf().get());
+        Thread.currentThread().join();
+    }
+
+
+
+
+    /**
+     * {@link CompletableFuture#allOf(CompletableFuture[])}
+     * @param
+     * @return
+     */
+    private static  void allOf(){
+         CompletableFuture.allOf(CompletableFuture.runAsync(()->{
+                    try {
+                        System.out.println("1======Start");
+                        TimeUnit.SECONDS.sleep(5);
+                        System.out.println("1=========end");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }).whenComplete((v, t) -> System.out.println("===============over===============")),
+                CompletableFuture.supplyAsync(()->{
+                    try {
+                        System.out.println("2======Start");
+                        TimeUnit.SECONDS.sleep(4);
+                        System.out.println("2=========end");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    return  "Hello";
+                }).whenComplete((v, t) -> System.out.println(v+ "===============over==============="))
+
+        );
+    }
+
+
+    /**
+     * {@link CompletableFuture#anyOf(CompletableFuture[])}
+     * @param
+     * @return
+     */
+    private static  Future<?> anyOf(){
+         return CompletableFuture.anyOf(CompletableFuture.runAsync(()->{
+            try {
+                System.out.println("1======Start");
+                TimeUnit.SECONDS.sleep(5);
+                System.out.println("1=========end");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).whenComplete((v, t) -> System.out.println("===============over===============")),
+          CompletableFuture.supplyAsync(()->{
+              try {
+                  System.out.println("2======Start");
+                  TimeUnit.SECONDS.sleep(4);
+                  System.out.println("2=========end");
+              } catch (InterruptedException e) {
+                  e.printStackTrace();
+              }
+              return  "Hello";
+          }).whenComplete((v, t) -> System.out.println(v+ "===============over==============="))
+
+          );
+    }
+
+
+    /**
+     * {@link CompletableFuture#completedFuture(Object)}
+     * @param data
+     * @return
+     */
+    private static  Future<Void> completed(String data){
+        return  CompletableFuture.completedFuture(data).thenAccept(System.out::println);
+    }
+
+
+    /**
+     * {@link CompletableFuture#supplyAsync(Supplier)}
+     * @return
+     */
+    private static  Future<?> runAsync(){
+      return  CompletableFuture.supplyAsync(Object::new)
+            .thenAccept(o -> {
+                try {
+                    System.out.println("Obj======Start");
+                    TimeUnit.SECONDS.sleep(5);
+                    System.out.println("Obj========="+o);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }).whenComplete((v, t) -> System.out.println("===============over==============="));
+    }
+
+
+    /**
+     * {@link CompletableFuture#supplyAsync(Supplier)}
+     */
+    private static  void supplyAsync(){
+        CompletableFuture.supplyAsync(Object::new)
+                .thenAccept(o -> {
+                    try {
+                        System.out.println("Obj======Start");
+                        TimeUnit.SECONDS.sleep(5);
+                        System.out.println("Obj========="+o);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    // 输出完了之后 返回的是void类型
+                }).runAfterBoth(CompletableFuture.supplyAsync(()->"Hello")
+                .thenAccept(s->{
+                    try {
+                        System.out.println("String======Start");
+                        TimeUnit.SECONDS.sleep(3);
+                        System.out.println("String========="+s);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }),()->System.out.print("=======finished======")
+        );
+    }
+}
+
+```
+41.3  CompletableFutureExample3 学习
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.*;
+import java.util.function.*;
+
+/**
+ * @ClassName: CompletableFutureExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/15 16:15
+ * History:
+ * @<version> 1.0
+ */
+public class CompletableFutureExample3 {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
+
+    }
+
+
+
+
+    /**
+     * {@link CompletableFuture#thenCompose(Function)}
+     */
+    private static  void thenCompose(){
+        CompletableFuture.supplyAsync(()->{
+            try {
+                System.out.println("start the compose1");
+                TimeUnit.SECONDS.sleep(5);
+                System.out.println("end the compose1");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  "compose-1";
+            // 上一个的输出作为下一个的输入
+        }).thenCompose(s-> CompletableFuture.supplyAsync(()->{
+            try {
+                System.out.println("start the compose2");
+                TimeUnit.SECONDS.sleep(3);
+                System.out.println("end the compose2");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  s.length();
+        }));
+
+    }
+
+
+
+    /**
+     * {@link CompletableFuture#thenCombine(CompletionStage, BiFunction)}
+     */
+    private static  void thenCombine(){
+        CompletableFuture.supplyAsync(()->{
+            try {
+                System.out.println("start the combine1");
+                TimeUnit.SECONDS.sleep(5);
+                System.out.println("end the combine1");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  "combine-1";
+            // 组合
+        }).thenCombine(CompletableFuture.supplyAsync(()->{
+            try {
+                System.out.println("start the combine2");
+                TimeUnit.SECONDS.sleep(3);
+                System.out.println("end the combine2");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  100;
+        }),(s, i) -> s.length() > i).whenComplete((v, t) -> System.out.println(v));
+
+    }
+
+
+
+    /**
+     * {@link CompletableFuture#acceptEither(CompletionStage, Consumer)}
+     */
+    private static  void acceptEither(){
+        CompletableFuture.supplyAsync(()->{
+            try {
+                System.out.println("start the acceptEither1");
+                TimeUnit.SECONDS.sleep(5);
+                System.out.println("end the acceptEither1");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  "acceptEither-1";
+            // 组合
+        }).acceptEither(CompletableFuture.supplyAsync(()->{
+            try {
+                System.out.println("start the acceptEither2");
+                TimeUnit.SECONDS.sleep(3);
+                System.out.println("end the acceptEither2");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  "acceptEither-2";
+        }),System.out::println);
+
+    }
+
+
+    /**
+     * {@link CompletableFuture#thenAcceptBoth(CompletionStage, BiConsumer)}
+     */
+    private static  void thenAcceptBoth(){
+        CompletableFuture.supplyAsync(()->{
+                    try {
+                        System.out.println("start the supplyAsync");
+                        TimeUnit.SECONDS.sleep(5);
+                        System.out.println("end the supplyAsync");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    return  "thenAcceptBoth";
+                    // 组合
+                }).thenAcceptBoth(CompletableFuture.supplyAsync(()->{
+                    try {
+                        System.out.println("start the thenAcceptBoth");
+                        TimeUnit.SECONDS.sleep(3);
+                        System.out.println("end the thenAcceptBoth");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    return  100;
+                }),(s, i)->System.out.print(s + "----" + i));
+
+    }
+
+}
+
+```
+41.4  CompletableFutureExample4 学习
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+/**
+ * @ClassName: CompletableFutureExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/15 16:15
+ * History:
+ * @<version> 1.0
+ */
+public class CompletableFutureExample4 {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
+        completeExceptionally();
+    }
+
+
+    /**
+     * {@link CompletableFuture#completeExceptionally(Throwable)}
+     */
+    private static  void completeExceptionally() throws ExecutionException, InterruptedException {
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            sleepSeconds(5);
+            System.out.println("===========================i will be still process...");
+            return "HELLo";
+        });
+        // 因为是异步的，所以在这里进行休眠，让其CompletableFuture 执行一定发生在 下面代码 的前面
+        sleepSeconds(1);
+        // 立即返回的机制
+        future.completeExceptionally(new RuntimeException());
+        System.out.println(future.get());
+    }
+
+
+    /**
+     * {@link CompletableFuture#join()}
+     */
+    private static  void testJoin() throws ExecutionException, InterruptedException {
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            sleepSeconds(5);
+            System.out.println("===========================i will be still process...");
+            return "HELLo";
+        });
+        String result = future.join();
+        System.out.println(result);
+    }
+
+
+    /**
+     * {@link CompletableFuture#complete(Object)}
+     */
+    private static  void complete() throws ExecutionException, InterruptedException {
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            sleepSeconds(5);
+            System.out.println("===========================i will be still process...");
+            return "HELLo";
+        });
+        // 已经转换了 就是true
+        boolean world = future.complete("WORLD");
+        System.out.println(world);
+        System.out.println(future.get());
+
+    }
+
+    private static  void  getNow() throws ExecutionException, InterruptedException {
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            sleepSeconds(5);
+            return "HELLo";
+        });
+        String result = future.getNow("WORLD");
+        System.out.println(result);
+        System.out.println(future.get());
+
+    }
+
+    
+    private static  void  sleepSeconds(long seconds){
+        try {
+            TimeUnit.SECONDS.sleep(seconds);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+}
+
+```
+41.5  CompletionServiceExample1 学习
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: CompletionServiceExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/14 17:23
+ * History:
+ * @<version> 1.0
+ */
+public class CompletionServiceExample1 {
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        futureDefect2();
+    }
+
+    /**
+     * no callback
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private static  void futureDefect1() throws ExecutionException, InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        Future<Integer> future = executorService.submit(() -> {
+            try {
+                TimeUnit.SECONDS.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return 100;
+        });
+        System.out.println("===================");
+        // 这里会阻塞，就会造成这一行代码下面的代码不能执行
+        future.get();
+    }
+
+    /**
+     * no callback
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private static  void futureDefect2() throws ExecutionException, InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        List<Callable<Integer>> callableList = Arrays.asList(
+                () -> {
+                    sleepSeconds(10);
+                    System.out.println("The 10 finished.");
+                    return 10;
+                },
+                () -> {
+                    sleepSeconds(20);
+                    System.out.println("The 20 finished.");
+                    return 20;
+                }
+        );
+
+        // 批量的处理
+        List<Future<Integer>> futures = executorService.invokeAll(callableList);
+        Integer v1 = futures.get(1).get();
+        System.out.println(v1);
+        Integer v2 = futures.get(0).get();
+        System.out.println(v2);
+
+    }
+
+
+    private static  void  sleepSeconds(long seconds){
+        try {
+            TimeUnit.SECONDS.sleep(seconds);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+```
+41.6  CompletionServiceExample2 学习
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: CompletionServiceExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/14 17:23
+ * History:
+ * @<version> 1.0
+ */
+public class CompletionServiceExample2 {
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        futureDefect2();
+    }
+
+    /**
+     * no callback
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private static  void futureDefect1() throws ExecutionException, InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        Future<Integer> future = executorService.submit(() -> {
+            try {
+                TimeUnit.SECONDS.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return 100;
+        });
+        System.out.println("===================");
+        // 这里会阻塞，就会造成这一行代码下面的代码不能执行
+        future.get();
+    }
+
+    /**
+     * no callback
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private static  void futureDefect2() throws ExecutionException, InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        List<Callable<Integer>> callableList = Arrays.asList(
+                () -> {
+                    sleepSeconds(10);
+                    System.out.println("The 10 finished.");
+                    return 10;
+                },
+                () -> {
+                    sleepSeconds(20);
+                    System.out.println("The 20 finished.");
+                    return 20;
+                }
+        );
+
+        ExecutorCompletionService<Integer> completionService = new ExecutorCompletionService<>(executorService);
+        List<Future<Integer>> futures = new ArrayList<>();
+        callableList.stream().forEach(callable -> futures.add(completionService.submit(callable)));
+
+        Future<Integer> future;
+        // 拿取最快完成的那一个，take是一个阻塞方法
+        while ((future = completionService.take()) != null){
+            System.out.println(future.get());
+        }
+
+    }
+
+
+    private static  void  sleepSeconds(long seconds){
+        try {
+            TimeUnit.SECONDS.sleep(seconds);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+```
+41.7 ComplexExample
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ComplexExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/15 15:34
+ * History:
+ * @<version> 1.0
+ */
+public class ComplexExample {
+    public static void main(String[] args) throws InterruptedException {
+
+        // CompletionService 相比 future 可以回调, 并且CompletionService 不是Executors 这个只是进行了保证
+        // CompletionService 关注的是完成的任务,不会关注未完成的任务
+        /*final ExecutorService service = Executors.newSingleThreadExecutor();
+        List<Runnable> tasks = IntStream.range(0, 5).boxed().map(ComplexExample::toTask).collect(Collectors.toList());
+        final CompletionService<Object> completionService = new ExecutorCompletionService<>(service);
+        tasks.forEach(r -> completionService.submit(Executors.callable(r)));
+        TimeUnit.SECONDS.sleep(12);
+        // 这里取 shutdownNow 线程池，关注这个任务的执行是 ExecutorService,
+        // 这个Runnable 返回的是未执行的, 那么在执行过程中被中断的任务 是不会放到这里面去的
+        //
+        List<Runnable> runnableList = service.shutdownNow();
+        System.out.println(runnableList);*/
+
+
+        //==========================================
+        final ExecutorService service = Executors.newSingleThreadExecutor();
+        List<Callable<Integer>> tasks = IntStream.range(0, 5).boxed().map(MyTask::new).collect(Collectors.toList());
+        final CompletionService<Integer> completionService = new ExecutorCompletionService<>(service);
+
+        tasks.forEach(completionService::submit);
+        TimeUnit.SECONDS.sleep(12);
+        // shutdownNow时候,返回的仅仅是队列里的,有的线程可能在执行过程中它被中断,或者出错了
+        service.shutdownNow();
+        // 这样可以拿出那些任务真正为完成
+        tasks.stream().filter(callable -> !((MyTask)callable).isSuccess())
+                .forEach(System.out::println);
+    }
+
+    private static class MyTask implements Callable<Integer>{
+        private final Integer value;
+        private boolean success = false;
+        MyTask(Integer value){
+            this.value = value;
+        }
+
+
+        @Override
+        public Integer call() throws Exception {
+            System.out.printf("The Task [%d] will be executed.\n", value);
+            TimeUnit.SECONDS.sleep(value *5 + 10);
+            System.out.printf("The Task [%d] execute done.\n", value);
+            return value;
+        }
+
+        public boolean isSuccess(){
+            return  success;
+        }
+    }
+
+    private static Runnable toTask(int i ){
+        return  ()->{
+            try {
+                System.out.printf("The Task [%d] will be executed.\n", i);
+                TimeUnit.SECONDS.sleep(i * 5 + 10);
+                System.out.printf("The Task [%d] execute done.\n", i);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        };
+    }
+}
+
+```
+41.8 ExecutorServiceExample 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ExecutorServiceExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/13 14:01
+ * {@link java.util.concurrent.ExecutorService}
+ * History:
+ * @<version> 1.0
+ */
+public class ExecutorServiceExample {
+    public static void main(String[] args) throws InterruptedException {
+//      isShutDown();
+//      isTerminated();
+//      executeRunnableError();
+        executeRunnableTask();
+    }
+
+    /**
+     * Question:
+     * when invoked the shutdown method, can execute the new runnable?
+     * Answer:
+     * No !!! the executor service will rejected after shutdown.
+     */
+    private static  void isShutDown(){
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        executorService.execute(()->{
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        System.out.println(executorService.isShutdown());
+        // 前面的任务还没有执行完，下面的打印不会打印出来
+        // 如果注释掉  executorService.shutdown(), 那么就可以看到下面的可以打印出来了
+        // 这个是因为上面任务已经执行完了
+        executorService.shutdown();
+        System.out.println(executorService.isShutdown());
+        executorService.execute(()-> System.out.println("i will be execute after shutdown????"));
+    }
+
+    /**
+     *
+     */
+    private static void isTerminated(){
+        ExecutorService executorService = Executors.newFixedThreadPool(1);
+        executorService.execute(()->{
+            try {
+                TimeUnit.SECONDS.sleep(2);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        executorService.shutdown();
+        System.out.println(executorService.isShutdown());
+        // 这个executor 还没有真正的总结掉，所以这是false
+        System.out.println(executorService.isTerminated());
+        // 是否在终结的过程中
+        System.out.println(((ThreadPoolExecutor)executorService).isTerminating());
+    }
+
+
+
+    private static void executeRunnableError() throws InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(10, new MyThreadFactory());
+        executorService.execute(()->{
+            try {
+                TimeUnit.SECONDS.sleep(2);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        IntStream.range(0, 10).boxed().forEach(i ->
+                executorService.execute(()-> System.out.println(1/0)));
+        executorService.shutdown();
+        executorService.awaitTermination(10, TimeUnit.MINUTES);
+        System.out.println("================================");
+    }
+
+    private static class MyThreadFactory implements ThreadFactory{
+        private final static AtomicInteger SEQ = new AtomicInteger();
+
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread thread = new Thread(r);
+            thread.setName("My-Thread-" + SEQ.getAndIncrement());
+            thread.setUncaughtExceptionHandler((t,cause) ->{
+                System.out.println("The thread " + t.getName() + " execute failed.");
+                cause.printStackTrace();
+                System.out.println("================================");
+            });
+            return thread   ;
+        }
+    }
+
+
+    /**
+     *
+     *                                        |----->
+     *                                        |----->
+     * send request-----> store db ----10---> |----->
+     *                                        |----->
+     *                                        |----->
+     */
+    private static void executeRunnableTask() throws InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(10, new MyThreadFactory());
+        IntStream.range(0, 10).boxed().forEach(i ->
+                executorService.execute(
+                        new MyTask(i) {
+                            @Override
+                            protected void error(Throwable cause) {
+                                System.out.println("The no:" + i + " failed, update status to error");
+                            }
+
+                            @Override
+                            protected void done() {
+                                System.out.println("The no:" + i + " successful, update status to DONE");
+                            }
+
+                            @Override
+                            protected void doExecute() {
+                               if(i % 3 ==0){
+                                   int tmp = i/0;
+                               }
+                            }
+
+                            @Override
+                            protected void doInit() {
+                               //
+                            }
+                        }
+                ));
+        executorService.shutdown();
+        executorService.awaitTermination(10, TimeUnit.MINUTES);
+        System.out.println("================================");
+    }
+
+    private abstract static class MyTask implements Runnable{
+        protected final int no;
+        private MyTask(int no){
+            this.no = no;
+        }
+
+        @Override
+        public void run() {
+            try {
+                this.doInit();
+                this.doExecute();
+                this.done();
+            }catch (Throwable cause){
+                this.error(cause);
+            }
+        }
+
+        protected abstract void error(Throwable cause);
+
+        protected abstract void done();
+
+        protected abstract void doExecute();
+
+        protected abstract void doInit();
+    }
+}
+
+```
+41.9 ExecutorServiceExample 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ExecutorServiceExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/13 14:01
+ * {@link ExecutorService}
+ * History:
+ * @<version> 1.0
+ */
+public class ExecutorServiceExample3 {
+    public static void main(String[] args) throws InterruptedException {
+      /*test();*/
+      /* testAllowCoreThreadTimeOut();*/
+      /*testRemove();*/
+       /*testPreStartCoreThread();*/
+        testThreadPoolAdvice();
+    }
+
+
+    /**
+     *
+     * @throws InterruptedException
+     */
+    private static void test() throws InterruptedException {
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(5);
+        System.out.println(executorService.getActiveCount());
+        executorService.execute(()->{
+            try {
+                // 这个任务运行结束，也不会结束整个操作，因为它里面已经有活动的线程。
+                //
+                TimeUnit.SECONDS.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        //休息20毫秒
+        TimeUnit.MICROSECONDS.sleep(20);
+        // 这个再来看看activeCount, 是一次性创建完 还是又创建了一个
+        System.out.println(executorService.getActiveCount());
+    }
+
+    /**
+     *  {@link ThreadPoolExecutor#allowCoreThreadTimeOut(boolean)}
+     */
+    private static void testAllowCoreThreadTimeOut(){
+        // 比如执行五个任务， 超过五个任务 它就会有五个任务在里面，如果不进行释放它是永远也不会进行释放的
+        // 虽然keepAliveTime 是0 ， 他需要去维持这个 coreSize的大小
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(5);
+
+        //设置keepAliveTime 时间
+        executorService.setKeepAliveTime(10, TimeUnit.SECONDS);
+
+        // 设置这个就会回收空闲线程吗？
+        // 设置这个属性后，会出现 Exception in thread "main" java.lang.IllegalArgumentException: Core threads must have nonzero keep alive times，
+        // 说明这个 这个keepAliveTime 不能为0, 所以在上面设置下时间,
+        // 设置后 会自动回收，我们都可以不用去调用 shutdown了，
+        // 设置了10s时间后 这个线程池里面的所以线程会被回收，并且这个线程池达到了terminated状态
+        executorService.allowCoreThreadTimeOut(true);
+        IntStream.range(0, 5).boxed().forEach(i ->{
+            executorService.execute(()->{
+                try {
+                    TimeUnit.SECONDS.sleep(3);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            });
+        });
+
+    }
+
+    /**
+     * {@link ThreadPoolExecutor#remove(Runnable)}
+     * @throws InterruptedException
+     */
+    private static void testRemove() throws InterruptedException {
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(2);
+        executorService.setKeepAliveTime(10, TimeUnit.SECONDS);
+        executorService.allowCoreThreadTimeOut(true);
+        IntStream.range(0, 5).boxed().forEach(i ->{
+            // 这个是主线程 main 去调用
+            // cpu 执行权， execute 会立即去创建线程 因为是异步的
+            executorService.execute(()->{
+                try {
+                    TimeUnit.SECONDS.sleep(5);
+                    System.out.println("===========i am finished========");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            });
+        });
+        // 这里休眠 是为了确保 提交的任务在 它之前
+        TimeUnit.MICROSECONDS.sleep(50);
+        // 休眠就是让下面的线程不在 上面的线程执行的前面
+        // 理论上下面的打印应该被执行，但是这个queue中任务被我们删除掉了
+        Runnable runnable = ()->{
+            System.out.println("i will never be executed!");
+        };
+        // 放入到queue 里面去
+        executorService.execute(runnable);
+        TimeUnit.MICROSECONDS.sleep(20);
+        // 永远也不会被执行，因为被删掉了
+    }
+
+    /**
+     * {@link ThreadPoolExecutor#prestartCoreThread()}
+     */
+    private static  void  testPreStartCoreThread(){
+        // 初始化的时候 是0
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(2);
+        System.out.println(executorService.getActiveCount());
+
+        System.out.println(executorService.prestartCoreThread());
+        System.out.println(executorService.getActiveCount());
+
+        // 不过调用多少次都不会超过coreSize的大小
+        System.out.println(executorService.prestartCoreThread());
+        System.out.println(executorService.getActiveCount());
+        executorService.execute(()->
+                {
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
+
+        executorService.execute(()->
+                {
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
+
+        System.out.println(executorService.prestartCoreThread());
+        System.out.println(executorService.getActiveCount());
+    }
+
+
+    /**
+     * {@link ThreadPoolExecutor#prestartAllCoreThreads()}
+     */
+    private static  void  testPreStartAllCoreThread(){
+        // 初始化的时候 是0
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(2);
+        executorService.setMaximumPoolSize(3);
+        System.out.println(executorService.getActiveCount());
+        // 预启动
+        int num = executorService.prestartAllCoreThreads();
+        System.out.println(num);
+        // 启动结果还是 只有两个，并不没有到达max, 他只是按照coreSize来启动
+        System.out.println(executorService.getActiveCount());
+
+       /* System.out.println(executorService.prestartCoreThread());
+        System.out.println(executorService.getActiveCount());
+
+        System.out.println(executorService.prestartCoreThread());
+        System.out.println(executorService.getActiveCount());
+        executorService.execute(()->
+                {
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
+
+        executorService.execute(()->
+                {
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
+
+        System.out.println(executorService.prestartCoreThread());
+        System.out.println(executorService.getActiveCount());*/
+    }
+
+
+    /**
+     * 提交一批任务 有几个完成了，成不成功就不知道了
+     */
+    private static void testGetCompletedTaskCount(){}
+
+
+
+    private static  void  testThreadPoolAdvice(){
+        ExecutorService executorService = new MyThreadPoolExecutor(1,
+                2, 30,
+                TimeUnit.SECONDS, new ArrayBlockingQueue<>(1),
+                r ->{
+                    Thread t = new Thread(r);
+                    return  t;
+                }, new ThreadPoolExecutor.AbortPolicy());
+
+        executorService.execute(new AbstractMyRunnable(1) {
+            @Override
+            public void run() {
+                System.out.println("=======================");
+            }
+        });
+    }
+
+
+    private abstract static class AbstractMyRunnable implements Runnable{
+        private final int no;
+
+        protected AbstractMyRunnable(int no){
+            this.no = no;
+        }
+
+        protected int getData(){
+            return  this.no;
+        }
+
+    }
+
+
+
+    private static class MyThreadPoolExecutor extends ThreadPoolExecutor{
+
+        public MyThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory, RejectedExecutionHandler handler) {
+            super(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue, threadFactory, handler);
+        }
+
+        @Override
+        protected void beforeExecute(Thread t, Runnable r) {
+            System.out.println("init the " + ((AbstractMyRunnable)r).getData());
+        }
+
+        @Override
+        protected void afterExecute(Runnable r, Throwable t) {
+            if(null == t){
+                System.out.println("successful " + ((AbstractMyRunnable)r).getData());
+            }else {
+                t.printStackTrace();
+            }
+        }
+    }
+}
+
+```
+41.10 ExecutorServiceExample4 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ExecutorServiceExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/13 14:01
+ * {@link ExecutorService}
+ * History:
+ * @<version> 1.0
+ */
+public class ExecutorServiceExample4 {
+    public static void main(String[] args) throws InterruptedException, ExecutionException, TimeoutException {
+        /*testInvokeAny();*/
+//        testInvokeAnyTimeOut();
+    }
+
+    /**
+     * Question:
+     *  when the result returned, other callable will be keep on process?
+     * Answer:
+     *  other callable will be canceled (if other not process finished).
+     * Note:
+     *  The invokeAny will be blocked caller;
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private static  void  testInvokeAny() throws ExecutionException, InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+
+        List<Callable<Integer>> collectList = IntStream.range(0, 5).boxed().map(i ->
+                (Callable<Integer>) () -> {
+
+                    TimeUnit.SECONDS.sleep(ThreadLocalRandom.current().nextInt(20));
+                    // 那么其中有一个返回之后，其他的callable还会不会继续执行？
+                    System.out.println(Thread.currentThread().getName()+ " :" + i);
+                    return i;
+                }).collect(Collectors.toList());
+        //那个先完成了就返回哪一个
+        Integer value = executorService.invokeAny(collectList);
+        System.out.println("===============finished=================");
+        System.out.println(value);
+    }
+
+
+    /**
+     * {@link ExecutorService#invokeAny(Collection, long, TimeUnit)}
+     */
+    private static  void  testInvokeAnyTimeOut() throws ExecutionException, InterruptedException, TimeoutException {
+        ExecutorService service = Executors.newFixedThreadPool(10);
+
+        Integer value = service.invokeAny(
+                IntStream.range(0, 5).boxed().map(i ->
+                (Callable<Integer>) () -> {
+                    TimeUnit.SECONDS.sleep(ThreadLocalRandom.current().nextInt(20));
+                    System.out.println(Thread.currentThread().getName() + " :" + i);
+                    return i;
+                }
+              ).collect(Collectors.toList()), 1, TimeUnit.SECONDS);
+        System.out.println("===============finished=================");
+        System.out.println(value);
+    }
+
+
+    /**
+     * {@link ExecutorService#invokeAll(Collection)}
+     * @throws InterruptedException
+     */
+    private static  void  testInvokeAll() throws InterruptedException {
+        ExecutorService service = Executors.newFixedThreadPool(10);
+        service.invokeAll(
+                IntStream.range(0, 5).boxed().map(i ->
+                        (Callable<Integer>) () -> {
+                    // 先执行----转换----再输出
+
+                            // 这里有一个缺点，就是其中有一个执行的很慢，
+                            // 他也要将第一阶段执行完后后 才会去执行第二阶段
+                            // 第二阶段执行完后才会去执行第三阶段
+                            TimeUnit.SECONDS.sleep(5);
+                            System.out.println(Thread.currentThread().getName() + " :" + i);
+                            return i;
+                        }
+                ).collect(Collectors.toList())
+                // parallelStream()
+        ).stream().map(future -> {
+            try {
+                // 将future中的结果拿出来。
+              return   future.get();
+            } catch (Exception e) {
+                throw  new RuntimeException(e);
+            }
+        }).forEach(System.out::println);
+        // callable 执行完后才会打印
+        System.out.println("===============finished=================");
+    }
+
+
+
+
+    /**
+     * {@link ExecutorService#invokeAll(Collection, long, TimeUnit)}
+     * @throws InterruptedException
+     */
+    private static  void  testInvokeAllTimeOut() throws InterruptedException {
+        ExecutorService service = Executors.newFixedThreadPool(10);
+        service.invokeAll(
+                IntStream.range(0, 5).boxed().map(i ->
+                        (Callable<Integer>) () -> {
+
+                            TimeUnit.SECONDS.sleep(ThreadLocalRandom.current().nextInt(10));
+                            System.out.println(Thread.currentThread().getName() + " :" + i);
+                            return i;
+                        }
+                ).collect(Collectors.toList()), 1, TimeUnit.SECONDS
+                // parallelStream()
+        ).stream().map(future -> {
+            try {
+                // 将future中的结果拿出来。
+                return   future.get();
+            } catch (Exception e) {
+                throw  new RuntimeException(e);
+            }
+        }).forEach(System.out::println);
+        // callable 执行完后才会打印
+        System.out.println("===============finished=================");
+    }
+
+
+    /**
+     * {@link ExecutorService#submit(Runnable)} 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private static  void  testSubmitRunnable() throws ExecutionException, InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        // 是一个异步方法，立即返回， 返回的是future
+        Future<?> future = executorService.submit(() -> {
+            try {
+                TimeUnit.SECONDS.sleep(3);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+        // 如果有结果说明执行 对Runnable执行结束了
+        future.get();
+    }
+
+
+    /**
+     * {@link ExecutorService#submit(Runnable, Object)}
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private static  void  testSubmitRunnableWithResult() throws ExecutionException, InterruptedException {
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        String result = "DONE";
+        Future<String> future = executorService.submit(() -> {
+            try {
+                TimeUnit.SECONDS.sleep(3);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }, result);
+
+        System.out.println(future.get());
+    }
+
+}
+
+```
+41.11 ExecutorServiceExample5 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: ExecutorServiceExample5
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/13 14:01
+ * {@link ExecutorService}
+ * History:
+ * @<version> 1.0
+ */
+public class ExecutorServiceExample5 {
+    public static void main(String[] args) throws InterruptedException, ExecutionException, TimeoutException {
+        ThreadPoolExecutor executorService = (ThreadPoolExecutor)Executors.newFixedThreadPool(2);
+        // 返回一个queue, 那么能往这个queue加一个runnable 让其运行喃
+        // 不通过submit的方式 或者invoke的方式，我们直接到queue里面去加任务 这样可不可以运行喃。
+
+        // 从运行的结果来看, executorService 去执行submit, invoke ,execute 的时候
+        //  它类似于 不仅仅是接收到了一个任务，还是收到了一个信号，这个信号会触发 这个在线程池里面的线程
+        // 的创建， 但是这个直接加进去  线程池里面的线程 不知道是不是要去创建线程 去执行。
+        // 因为大家都在wait，都在等待这个信号。
+        executorService.getQueue().add(()-> System.out.print("I am added directly into the queue"));
+
+    }
+}
+
+```
+41.12 ExecutorsExample 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ExecutorsExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/13 9:26
+ * History:
+ * @<version> 1.0
+ */
+public class ExecutorsExample {
+    public static void main(String[] args) throws InterruptedException {
+      useCachedThreadPool();
+    }
+
+    /**
+     * 这个不自动shutdown ,是因为始终有一个线程是 lived 的.
+     *
+     * @throws InterruptedException
+     */
+    private static void  useSinglePool() throws InterruptedException {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        // 这个转换会失败，因为ThreadPoolExecutor不是 newSingleThreadExecutor的实例
+//        System.out.println(((ThreadPoolExecutor)executorService).getActiveCount());
+
+        //boxed将其封箱，就是将int装箱成integer
+        IntStream.range(0, 10).boxed().forEach(i -> executorService
+                .execute(()->{
+                    try {
+                        TimeUnit.SECONDS.sleep(10);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println(Thread.currentThread().getName()+ " [" + i +"] ");
+                }));
+
+        TimeUnit.SECONDS.sleep(1);
+        System.out.println(((ThreadPoolExecutor)executorService).getActiveCount());
+    }
+
+
+    /**
+     * new ThreadPoolExecutor(nThreads, nThreads,
+     *                                       0L, TimeUnit.MILLISECONDS,
+     *                                       new LinkedBlockingQueue<Runnable>());
+     * 虽然keepAliveTime=0，但是这个不回收，
+     * 因为这个idle(空闲)线程 不大于core,所以不会进行回收
+     *
+     * @throws InterruptedException
+     */
+    private static void  useFixedSizePool() throws InterruptedException {
+        ExecutorService service = Executors.newFixedThreadPool(10);
+        System.out.println(((ThreadPoolExecutor)service).getActiveCount());
+
+        IntStream.range(0, 10).boxed().forEach(i -> service
+                .execute(()->{
+                    try {
+                        TimeUnit.SECONDS.sleep(10);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println(Thread.currentThread().getName()+ " [" + i +"] ");
+                }));
+
+        TimeUnit.SECONDS.sleep(1);
+        System.out.println(((ThreadPoolExecutor)service).getActiveCount());
+    }
+
+
+
+    /**
+     *   return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+     *                                       60L, TimeUnit.SECONDS,
+     *                                       new SynchronousQueue<Runnable>());
+     * BlockingQueue是一个  SynchronousQueue<Runnable>()
+     * 这个阻塞队列只能放一个元素的BlockingQueue,
+     * 所以他不会把任务暂存起来，只有等到1分钟后 它发现有空闲的，他才会去处理
+     * 发现这些线程大于core线程个数，core线程个数是0，那么就会将其空闲的线程全部回收了
+     *
+     * @throws InterruptedException
+     */
+    private static void  useCachedThreadPool() throws InterruptedException {
+        ExecutorService service = Executors.newCachedThreadPool();
+        System.out.println(((ThreadPoolExecutor)service).getActiveCount());
+
+        service.execute(()-> System.out.println("==============="));
+        System.out.println(((ThreadPoolExecutor)service).getActiveCount());
+
+        IntStream.range(0, 100).boxed().forEach(i -> service
+                .execute(()->{
+                    try {
+                        TimeUnit.SECONDS.sleep(10);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println(Thread.currentThread().getName()+ " [" + i +"] ");
+                }));
+
+        TimeUnit.SECONDS.sleep(1);
+        System.out.println(((ThreadPoolExecutor)service).getActiveCount());
+    }
+}
+
+```
+
+
+41.13 ExecutorsExample2 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+/**
+ * @ClassName: ExecutorsExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/13 9:26
+ * History:
+ * @<version> 1.0
+ */
+public class ExecutorsExample2 {
+    /**
+     * 命令：dxdiag 这个是directx诊断工具命令
+     * @param args
+     * @throws InterruptedException
+     */
+    public static void main(String[] args) throws InterruptedException {
+        /**
+         * 会自动结束，也就是说它 清光了所以的任务，
+         * 包括queue里面的任务之后 它会全部结束
+         */
+        ExecutorService service = Executors.newWorkStealingPool();
+        //查看cup核数
+//        Optional.of(Runtime.getRuntime().availableProcessors())
+//                .ifPresent(System.out::println);
+        List<Callable<String>> callableList = IntStream.range(0, 20).boxed().map(i ->
+                (Callable<String>) () -> {
+                    System.out.println("Thread " + Thread.currentThread().getName());
+                    sleepSeconds(2);
+                    return "Task-" + i;
+                }
+        ).collect(Collectors.toList());
+
+        // 这个返回是立即返回，但是结果要等到真正的线程池用完 启动了任务才会给你
+        // 所以 这就叫future 设计模式，就是让你的程序不阻塞，可以进行下面的操作
+        // 可以继续往下走
+        //List<Future<String>> futures = service.invokeAll(callableList);
+        service.invokeAll(callableList).stream().map(future ->{
+            try {
+               return future.get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        }).forEach(System.out::println);
+    }
+
+
+    private  static  void sleepSeconds(long seconds){
+        try {
+            TimeUnit.SECONDS.sleep(seconds);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+```
+
+
+41.13 FutureExample 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.*;
+
+/**
+ * @ClassName: FutureExample
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/14 14:35
+ * History:
+ * @<version> 1.0
+ */
+public class FutureExample {
+    public static void main(String[] args) throws ExecutionException, InterruptedException, TimeoutException {
+        /*testGet();*/
+        testGetWithTimeOut();
+    }
+
+    /**
+     * {@link Future#get()}
+     */
+    private static  void testGet() throws ExecutionException, InterruptedException {
+        ExecutorService executorService =  Executors.newCachedThreadPool();
+        Future<Integer> future = executorService.submit(()->{
+            try {
+                TimeUnit.SECONDS.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  10;
+        });
+        //===========不用去等待， 快速返回有机会去执行其他的操作=====================
+        System.out.println("==============i will be printed quickly.===================");
+        //================================
+
+        Thread callerThread = Thread.currentThread();
+        new Thread(()->{
+            // 这个线程启动了，但是还没有具备可以执行的running状态 会有可能先执行下面的代码
+            // 所以这个让其休眠几秒，让其线程到达running状态
+            try {
+                TimeUnit.MILLISECONDS.sleep(3);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            // 让这个线程去打断看看能不能接着往下执行
+            callerThread.interrupt();
+        }).start();
+        //  因为这个在拿取结果的时候需要等待10s
+        // 在等的过程中 是无法打断的，所以这个get 方法 打断的是main
+        Integer result = future.get();
+        System.out.println("=====================" + result + "========================");
+    }
+
+
+
+    /**
+     * {@link Future#get(long, TimeUnit)}
+     */
+    private static  void testGetWithTimeOut() throws ExecutionException, InterruptedException, TimeoutException {
+        ExecutorService executorService =  Executors.newCachedThreadPool();
+        Future<Integer> future = executorService.submit(()->{
+            try {
+                TimeUnit.SECONDS.sleep(10);
+                System.out.println("=====================");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  10;
+        });
+
+        Integer result = future.get(5, TimeUnit.SECONDS);
+            //超时了之后 也会去执行这个
+        System.out.println(result);
+
+    }
+}
+
+```
+41.14 FutureExample2 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * @ClassName: FutureExample2
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/14 14:35
+ * History:
+ * @<version> 1.0
+ */
+public class FutureExample2 {
+    public static void main(String[] args) throws ExecutionException, InterruptedException, TimeoutException {
+        /*testIsDone();*/
+        testIsDone2();
+    }
+
+    /**
+     * {@link Future#isDone()}
+     */
+    private static  void testIsDone() throws ExecutionException, InterruptedException {
+        ExecutorService executorService =  Executors.newCachedThreadPool();
+        Future<Integer> future = executorService.submit(()->{
+            try {
+                TimeUnit.SECONDS.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return  10;
+        });
+        Integer result = future.get();
+        // 正常结束会返回
+        // 还有一种是出现了错误
+        System.out.println(result + " is done"+future.isDone());
+    }
+
+
+    /**
+     * 如果出现了错误
+     * {@link Future#isDone()}
+     */
+    private static  void testIsDone2() throws ExecutionException, InterruptedException {
+        ExecutorService executorService =  Executors.newCachedThreadPool();
+        Future<Integer> future = executorService.submit(()->{
+            // 还有一种是出现了错误
+              throw  new RuntimeException();
+        });
+        // 这了要捕获异常，不然异常就抛出去了不能进行异常处理
+        try {
+
+            Integer result = future.get();
+            System.out.println(result);
+        }catch (Exception e){
+            // 出现了问题 也表示结束了，但是不一定代表着正确的结束了
+            System.out.println( " is done"+future.isDone());
+        }
+    }
+
+
+    /**
+     * try to cancel  maybe failed.
+     * <ul>
+     *  <li>task is completed already.</li>
+     *  <li>has already been cancelled. </li>
+     * </>
+     *
+     */
+    private static void testCancel() throws ExecutionException, InterruptedException {
+        ExecutorService executorService =  Executors.newCachedThreadPool();
+        AtomicBoolean running = new AtomicBoolean(true);
+        Future<Integer> future = executorService.submit(()-> {
+//            try {
+//                TimeUnit.SECONDS.sleep(10);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+
+            while (running.get()){
+
+            }
+            return  10;
+        });
+        TimeUnit.MILLISECONDS.sleep(10);
+        System.out.println(future.cancel(true));
+        // 已经被cancel过那么就不能再次被cancel.
+//        System.out.println(future.cancel(true));
+
+        System.out.println(future.isDone());
+        //结果已经返回，但是任务 还一直在执行，这个任务有可能非常耗时，并且没有打断它的地方
+        System.out.println(future.isCancelled());
+    }
+
+
+
+    /**
+     * try to cancel  maybe failed.
+     * <ul>
+     *  <li>task is completed already.</li>
+     *  <li>has already been cancelled. </li>
+     * </>
+     *
+     */
+    private static void testCancel2() throws ExecutionException, InterruptedException {
+        ExecutorService executorService =  Executors.newCachedThreadPool();
+        AtomicBoolean running = new AtomicBoolean(true);
+        Future<Integer> future = executorService.submit(()-> {
+//            try {
+//                TimeUnit.SECONDS.sleep(10);
+//                System.out.println("=========================");
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+            // 当遇到某个很长的任务，怎么去cancel喃，就是通过这种方式
+            //!Thread.interrupted();
+            while (!Thread.interrupted()){
+
+            }
+            System.out.println("11111111111111111111111");
+            return  10;
+        });
+        TimeUnit.MILLISECONDS.sleep(10);
+        System.out.println(future.cancel(true));
+        System.out.println(future.isDone());
+        System.out.println(future.isCancelled());
+        // 因为已经 cancel 所以再次去拿取，是拿取不到的,会抛出异常
+//        System.out.println(future.get());
+    }
+
+}
+
+```
+41.15 ScheduledExecutorServiceExample1 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @ClassName: ScheduledExecutorServiceExample1
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/15 13:41
+ * History:
+ * @<version> 1.0
+ */
+public class ScheduledExecutorServiceExample1 {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(2);
+
+        /*ScheduledFuture<?> future = executor.schedule(()->
+                System.out.println("i will be invoked!"), 2 , TimeUnit.SECONDS);
+        // cancel之后还会执行吗？ cancel 之后就不会再执行了
+        System.out.println(future.cancel(true));*/
+
+       /* ScheduledFuture<Integer> scheduled =executor.schedule(()->2, 2, TimeUnit.SECONDS);
+        System.out.println(scheduled.get());*/
+
+        /**
+         *period 2 seconds execute a task.
+         * but the task spend 5 seconds actually
+         *
+         * solution 1: (crontab/quartz/Control-M)
+         *
+         * period first policy
+         * 0:5 (1个任务在执行的过程中实际上花了5秒)
+         * 2:5 (周期2s到了之后，下一个 有去启动了一个)
+         * 4:5 (在第4秒时候又会去启动一个)
+         *
+         * solution 2:(JDK timer)
+         * (周期还是2)
+         * 0:5(第零秒执行了一个任务 花了5秒，等这个执行结束之后，不会去重启 一个
+         * 去检查 这个执行了5秒 超过了这个周期2秒，所以从5秒开始有执行了一个)
+         * 5:5
+         * 10:5
+         *
+         * 下面的测试休眠5秒，看看这个是和那个相同
+         */
+        final AtomicLong interval = new AtomicLong(0L);
+        ScheduledFuture<?> future =executor.scheduleAtFixedRate(()->
+        {
+           long currentTimeMills = System.currentTimeMillis();
+           if(interval.get() == 0){
+               System.out.printf("The first time trigger task at %d\n", currentTimeMills);
+           }else {
+               System.out.printf("The actually spend [%d]\n", currentTimeMills - interval.get());
+           }
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            interval.set(currentTimeMills);
+        }, 1,2, TimeUnit.SECONDS);
+
+    }
+}
+
+```
+
+41.16 ScheduledExecutorServiceExample2 测试
+```java
+package com.learn.concurrenty.juc.untils.executors;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * @ClassName: ScheduledExecutorServiceExample2
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/15 13:41
+ * History:
+ * @<version> 1.0
+ */
+public class ScheduledExecutorServiceExample2 {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        testScheduleWithFixedDelay();
+    }
+
+    private static  void  testScheduleWithFixedDelay(){
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(2);
+        final AtomicLong interval = new AtomicLong(0L);
+        //设置一个scheduled 它会固定的延迟
+        ScheduledFuture<?> future = executor.scheduleWithFixedDelay(() ->
+        {
+            long currentTimeMills = System.currentTimeMillis();
+            if(interval.get() == 0){
+                System.out.printf("The first time trigger task at %d\n", currentTimeMills);
+            }else {
+                System.out.printf("The actually spend [%d]\n", currentTimeMills - interval.get());
+            }
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            interval.set(currentTimeMills);
+            System.out.println(Thread.currentThread().getName());
+        }, 1, 2, TimeUnit.SECONDS);
+
+    }
+
+    private static  void test1() throws InterruptedException {
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(2);
+        // 这个值默认是false,就是在shutdown后 不在周期性的去执行
+        System.out.println(executor.getContinueExistingPeriodicTasksAfterShutdownPolicy());
+        final AtomicLong interval = new AtomicLong(0L);
+        ScheduledFuture<?> future =executor.scheduleAtFixedRate(()->
+        {
+            long currentTimeMills = System.currentTimeMillis();
+            if(interval.get() == 0){
+                System.out.printf("The first time trigger task at %d\n", currentTimeMills);
+            }else {
+                System.out.printf("The actually spend [%d]\n", currentTimeMills - interval.get());
+            }
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            interval.set(currentTimeMills);
+            // period 是固定的
+        }, 1,2, TimeUnit.SECONDS);
+
+        // 让其真正执行了
+        TimeUnit.MILLISECONDS.sleep(1200);
+        executor.shutdown();
+    }
+
+
+    private static  void test2() throws InterruptedException{
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(2);
+        System.out.println(executor.getContinueExistingPeriodicTasksAfterShutdownPolicy());
+        final AtomicLong interval = new AtomicLong(0L);
+        //设置一个scheduled 它会固定的延迟
+        ScheduledFuture<?> future = executor.scheduleWithFixedDelay(() ->
+        {
+            long currentTimeMills = System.currentTimeMillis();
+            if(interval.get() == 0){
+                System.out.printf("The first time trigger task at %d\n", currentTimeMills);
+            }else {
+                System.out.printf("The actually spend [%d]\n", currentTimeMills - interval.get());
+            }
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            interval.set(currentTimeMills);
+            System.out.println(Thread.currentThread().getName());
+            // delay 不是固定的
+        }, 1, 2, TimeUnit.SECONDS);
+    }
+}
+
+```
+42.1 自定义实现LinkedList
+```java
+package com.learn.concurrenty.juc.collections;
+
+/**
+ * @ClassName: MyLinkedList
+ * @Description: 自定义实现LinkedList
+ * @Author: lin
+ * @Date: 2020/4/16 9:28
+ * History:
+ * @<version> 1.0
+ */
+public class MyLinkedList<E> {
+
+    private static final String PLAIN_NULL="null";
+    /**
+     * 因为是 单向的,所以第一个是first
+     */
+    private Node<E> first;
+
+    /**
+     * 定义一个空值
+     */
+    private final Node<E> NULL = (Node<E>) null;
+
+    /**
+     * 元素个数
+     */
+    private int size ;
+
+    /**
+     * 构造方法，初始化链表中第一个元素
+     * 因为还没有插入数据，所以第一个元素是空值
+     */
+    public MyLinkedList(){
+        this.first = NULL;
+    }
+
+    public int size(){
+        return  size;
+    }
+
+    /**
+     * 看看元素是否为空
+     * @return
+     */
+    public boolean isEmpty(){
+        return (size() ==0);
+    }
+
+
+
+
+    /**
+     * 提供一个静态方法，添加多个元素
+     * @param elements
+     * @param <E>
+     * @return
+     */
+    public static  <E> MyLinkedList<E> of(E ...elements){
+        // 如果元素长度为0
+        final  MyLinkedList<E> myLinkedList = new MyLinkedList<>();
+        if(elements.length != 0){
+            // 遍历去 将元素添加到这个list中去
+            for (E e: elements) {
+               myLinkedList.addFirst(e);
+            }
+        }
+        return  myLinkedList;
+    }
+
+    /**
+     * 添加元素
+     * @param e
+     * @return
+     */
+    public MyLinkedList<E> addFirst(E e){
+        // 先声明一个Node,将元素放到节点中去
+        final Node<E> newNode = new Node<>(e);
+        // 因为链表中还没有元素,所以Node 的下一个元素就是first
+        newNode.next = first;
+        // 将元素个数++;
+        size++;
+        // 那么第一个元素就是 newNode
+        this.first = newNode;
+        // 返回当前对象
+        return this ;
+    }
+
+
+    /**
+     * 判断元素是存在
+     * @param e
+     * @return
+     */
+    public boolean contains(E e){
+        //那么先从第一个节点开始
+        Node<E> current = first;
+        // 首先判断这元素是不是为空
+        while (null != current ){
+            if(current.value == e){
+                //如果相等那么就返回true;
+                return  true;
+            }
+            // 循环判断,第一个判断后不想等,那么就比较下一个
+            // 将当前的下一个元素 取出来比较
+            current = current.next;
+        }
+        return  false;
+    }
+
+
+    /**
+     * 移除元素
+     */
+    public E removeFirst(){
+        // 第一步，我们移除元素时,先判断元素链表中元素是否为空
+        // 然后从第一个元素开始,就是后进先出的方式,
+        // 这一点和出栈入栈的操作有点类似
+        if(this.isEmpty()){
+            // 可以抛出异常也可以 直接返回null
+           throw  new NoElementException("The linked list is empty.");
+        }
+        // 将第一个元素放到临时节点中去
+        Node<E> node = first;
+        first = node.next;
+        size -- ;
+        // 返回移除元素的值,也就是移除了哪一个
+        return node.value;
+    }
+
+
+    @Override
+    public String toString() {
+        if(this.isEmpty()){
+            return  "[]";
+        }else{
+            StringBuilder builder = new StringBuilder("[");
+            Node<E> current = first;
+            while (current != null){
+                builder.append( current.toString()).append(",");
+                current = current.next;
+            }
+            // 当为空时 就是最后一个元素, 将builder中最后一个元素的符号进行替换
+            builder.replace(builder.length()-1, builder.length(), "]");
+            return  builder.toString();
+        }
+    }
+
+    static class NoElementException extends RuntimeException{
+        NoElementException(String message){
+            super(message);
+        }
+    }
+
+    // 单向链表: 每一个节点保留下一个节点的指针
+
+    private static class  Node<E> {
+        E  value;
+        Node<E> next;
+        public Node(E value){
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            if(null != value){
+                return  value.toString();
+            }
+            return PLAIN_NULL   ;
+        }
+    }
+
+
+    public static void main(String[] args) {
+        MyLinkedList<String> linkedList = MyLinkedList.of("Hello", "World", "Scala",
+                "Java", "Thread");
+        linkedList.addFirst("Current").addFirst("Test");
+        System.out.println(linkedList.size());
+        System.out.println(linkedList.contains("Test"));
+        System.out.println("======================");
+        System.out.println(linkedList);
+        while (!linkedList.isEmpty()){
+            System.out.println(linkedList.removeFirst());
+        }
+        System.out.println(linkedList.size());
+        System.out.println(linkedList.isEmpty());
+    }
+}
+
+```
+42.2 PriorityLinkedList
+```java
+package com.learn.concurrenty.juc.collections;
+
+/**
+ * 优先级 链表
+ * @ClassName: PriorityLinkedList
+ * @Description: 
+ * @Author: lin
+ * @Date: 2020/4/16 9:28
+ * History:
+ * @<version> 1.0
+ */
+public class PriorityLinkedList<E extends Comparable<E>>  {
+
+    private static final String PLAIN_NULL="null";
+    /**
+     * 因为是 单向的,所以第一个是first
+     */
+    private Node<E> first;
+
+    /**
+     * 定义一个空值
+     */
+    private final Node<E> NULL = (Node<E>) null;
+
+    /**
+     * 元素个数
+     */
+    private int size ;
+
+    /**
+     * 构造方法，初始化链表中第一个元素
+     * 因为还没有插入数据，所以第一个元素是空值
+     */
+    public PriorityLinkedList(){
+        this.first = NULL;
+    }
+
+    public int size(){
+        return  size;
+    }
+
+    /**
+     * 看看元素是否为空
+     * @return
+     */
+    public boolean isEmpty(){
+        return (size() ==0);
+    }
+
+
+
+
+    /**
+     * 提供一个静态方法，添加多个元素
+     * @param elements
+     * @param <E>
+     * @return
+     */
+    public static  <E extends  Comparable<E>> PriorityLinkedList<E> of(E ...elements){
+        // 如果元素长度为0
+        final PriorityLinkedList<E> myLinkedList = new PriorityLinkedList<>();
+        if(elements.length != 0){
+            // 遍历去 将元素添加到这个list中去
+            for (E e: elements) {
+               myLinkedList.addFirst(e);
+            }
+        }
+        return  myLinkedList;
+    }
+
+    /**
+     * 插入元素时候 去比较
+     * 添加元素
+     * @param e
+     * @return
+     */
+    public PriorityLinkedList<E> addFirst(E e){
+        // 先声明一个Node,将元素放到节点中去
+        final Node<E> newNode = new Node<>(e);
+        // 声明前面一个 节点
+        Node<E> previous = NULL;
+        // 要将前面的
+        Node<E> current = first;
+        // 当还没有到最后一个元素 并且 这个元素大于第一个
+        //
+        while (current!= null && e.compareTo(current.value) > 0){
+            // 那么前一个元素就是第一个元素
+             previous = current;
+             current = current.next;
+        }
+        // 如果没有元素或者 比第一个都小
+        if(previous == NULL){
+            // 第一个元素就是这个新声明的
+            first = newNode;
+            // 将它的next 指向了 前一个的first
+            //newNode.next = current;
+        }else{
+            // 找到了一个比当前元素大的 就要换一下 指向
+            // 那么前一个元素的下一个 就是这个新定义的节点
+            previous.next = newNode;
+            // 这个新定义的节点的下一个 就是当前的 current;
+            //newNode.next = current;
+        }
+        newNode.next = current;
+        size ++;
+        return  this;
+    }
+
+
+    /**
+     * 判断元素是存在
+     * @param e
+     * @return
+     */
+    public boolean contains(E e){
+        //那么先从第一个节点开始
+        Node<E> current = first;
+        // 首先判断这元素是不是为空
+        while (null != current ){
+            if(current.value == e){
+                //如果相等那么就返回true;
+                return  true;
+            }
+            // 循环判断,第一个判断后不想等,那么就比较下一个
+            // 将当前的下一个元素 取出来比较
+            current = current.next;
+        }
+        return  false;
+    }
+
+
+    /**
+     * 移除元素
+     */
+    public E removeFirst(){
+        // 第一步，我们移除元素时,先判断元素链表中元素是否为空
+        // 然后从第一个元素开始,就是后进先出的方式,
+        // 这一点和出栈入栈的操作有点类似
+        if(this.isEmpty()){
+            // 可以抛出异常也可以 直接返回null
+           throw  new NoElementException("The linked list is empty.");
+        }
+        // 将第一个元素放到临时节点中去
+        Node<E> node = first;
+        first = node.next;
+        size -- ;
+        // 返回移除元素的值,也就是移除了哪一个
+        return node.value;
+    }
+
+
+    @Override
+    public String toString() {
+        if(this.isEmpty()){
+            return  "[]";
+        }else{
+            StringBuilder builder = new StringBuilder("[");
+            Node<E> current = first;
+            while (current != null){
+                builder.append( current.toString()).append(",");
+                current = current.next;
+            }
+            // 当为空时 就是最后一个元素, 将builder中最后一个元素的符号进行替换
+            builder.replace(builder.length()-1, builder.length(), "]");
+            return  builder.toString();
+        }
+    }
+
+
+
+    static class NoElementException extends RuntimeException{
+        NoElementException(String message){
+            super(message);
+        }
+    }
+
+    // 单向链表: 每一个节点保留下一个节点的指针
+
+    private static class  Node<E> {
+        E  value;
+        Node<E> next;
+        public Node(E value){
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            if(null != value){
+                return  value.toString();
+            }
+            return PLAIN_NULL   ;
+        }
+    }
+
+
+    public static void main(String[] args) {
+        PriorityLinkedList<Integer> linkedList = PriorityLinkedList.of(10, 1, 20, 0, 4, -5, 100, 36, 89, 67);
+        System.out.println(linkedList);
+    }
+}
+
+```
+42.3 简单跳表 
+```java
+package com.learn.concurrenty.juc.collections;
+
+import java.util.Random;
+
+/**
+ * @ClassName: SimpleSkipList
+ * @Description: 简单跳表
+ * @Author: lin
+ * @Date: 2020/4/16 14:46
+ * History:
+ * @<version> 1.0
+ */
+public class SimpleSkipList {
+    /**
+     * 跳表的头和尾 都对应下层链表的头和尾
+     */
+    private final static byte HEAD_NODE = (byte) -1;
+    private final static byte DATA_NODE = (byte) 0;
+    private final static byte TAIL_NODE = (byte) -1;
+
+    private static class Node{
+        private Integer value;
+        private Node up;
+        private Node down;
+        private Node left;
+        private Node right;
+        private byte bit;
+
+        public  Node(Integer value, byte bit){
+            this.value = value;
+            this.bit = bit;
+        }
+
+        public Node(Integer value){
+            this(value, DATA_NODE);
+        }
+    }
+
+    /**
+     * 节点的头
+     */
+    private Node head;
+    /**
+     * 节点的尾
+     */
+    private Node tail;
+
+    /**
+     * 节点的元素个数
+     */
+    private int size;
+    /**
+     * 高度
+     */
+    private int height;
+    /**
+     * 简单的随机算法
+     */
+    private Random random;
+
+    /**
+     * 构造方法 这个跳表中 头节点，和尾节点
+     *
+     */
+    public  SimpleSkipList(){
+        this.head = new Node(null, HEAD_NODE);
+        this.tail = new Node(null , TAIL_NODE);
+        head.right = tail;
+        tail.left = head;
+        // 简单随机数
+        this.random = new Random(System.currentTimeMillis());
+    }
+
+
+    /**
+     *  最底层 包含所有元素
+     * 分层查找
+     * @param element
+     * @return
+     */
+    private Node find(Integer element){
+        Node current = head;
+        for(;;){
+            // 不是最后一个 并且
+            while (current.right.bit !=TAIL_NODE && current.right.value <= element){
+                current = current.right;
+            }
+            // 如果下面的指针 不为空, 那么就将当前节点的下面指针
+            // 指向 当前
+            if(current.down != null){
+                current = current.down;
+            }else {
+                break;
+            }
+        }
+        // the current<=element< current.right(if exist)
+        return  current;
+    }
+
+    /**
+     * 插入元素
+     * @param element
+     */
+    public void  add(Integer element){
+        // 首先查询这个元素 相近的元素
+        Node findNode = this.find(element);
+        // 声明一个node
+        Node newNode = new Node(element);
+
+        /**  双向
+         *
+         *   +------+      +-----+        +-----+
+         *            --->           --->
+         *    9(node)      newNode         20(node)
+         *            <---           <---
+         *   +------+      +-----+        +-----+
+         */
+
+        newNode.left = findNode;
+        // 那么新节点的 右指针 是 临近节点的右指针
+        newNode.right = findNode.right;
+        // 临近节点的 右指针的 左指针 就是 新节点
+        findNode.right.left = newNode;
+        findNode.right = newNode;
+
+
+        // 需不需要提层数, 也就是将相应的节点提到 相应的其他层次去
+        // 目前0层
+        int currentLevel = 0;
+        // 这里随机 结构 非常关键, 这里问题特别大
+        // 如果这个随机数 小于 0.5 那么就要 提层数
+        while (random.nextDouble() < 0.3d){
+            // 判断是否大于层高
+            if (currentLevel >= height){
+                height++;
+                Node dumyHead = new Node(null, HEAD_NODE);
+                Node dumyTail = new Node(null, TAIL_NODE);
+
+                dumyHead.right = dumyTail;
+                dumyHead.down = head;
+                head.up = dumyHead;
+
+                dumyTail.left = dumyHead;
+                dumyHead.down = tail;
+                tail.up = dumyTail;
+
+                head = dumyHead;
+                tail = dumyTail;
+            }
+             while ((findNode != null) && findNode.up == null){
+                  findNode = findNode.left;
+             }
+              findNode = findNode.up;
+
+             Node upNode = new Node(element);
+             upNode.left = findNode;
+             upNode.right = findNode.right;
+             upNode.down = newNode;
+
+             findNode.right.left = upNode;
+             findNode.right = upNode;
+             newNode.up = upNode;
+
+             newNode = upNode;
+             currentLevel ++;
+        }
+        size++;
+    }
+
+    /**
+     * 一层一层的取出来
+     */
+    public void dumpSkipList(){
+        Node temp = head;
+        int i = height+1;
+        while (temp != null) {
+            System.out.printf("Total [%d] height [%d]", height+1, i--);
+            Node node = temp.right;
+            while (node.bit == DATA_NODE){
+                System.out.printf("->%d", node.value);
+                node = node.right;
+            }
+            System.out.println("\n");
+            temp = temp.down;
+        }
+        System.out.println("====================================");
+    }
+
+
+    /**
+     *
+     * @param element
+     * @return
+     */
+    public boolean contains(Integer element){
+        Node node = this.find(element);
+        return  (node.value.equals(element));
+    }
+
+    /**
+     *
+     * @param element
+     * @return
+     */
+    public  Integer get(Integer element){
+        Node node = this.find(element);
+        return  (node.value.equals(element)) ? node.value : null;
+    }
+
+    public int size(){
+        return size;
+    }
+
+    /**
+     * 看看元素是否为空
+     * @return
+     */
+    public boolean isEmpty(){
+        return (size() ==0);
+    }
+
+
+    public static void main(String[] args) {
+        SimpleSkipList simpleSkipList = new SimpleSkipList();
+        simpleSkipList.add(10);
+        simpleSkipList.dumpSkipList();
+
+        simpleSkipList.add(1);
+        simpleSkipList.dumpSkipList();
+
+        Random random = new Random();
+        int count = 10;
+        for (int i = 0; i < count ; i++) {
+            simpleSkipList.add(random.nextInt(1000));
+        }
+        simpleSkipList.dumpSkipList();
+    }
+}
+
+```
+43.1 自定义一个CopyOnWriteMap
+```java
+package com.learn.concurrenty.juc.collections.custom;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * 为什么jdk中没有实现 CopyOnWriteMap?
+ * @ClassName: CopyOnWriteMap
+ * @Description: 自定义一个CopyOnWriteMap
+ * @Author: lin
+ * @Date: 2020/4/20 15:54
+ * History:
+ * @<version> 1.0
+ */
+public class CopyOnWriteMap<K,V> implements Map<K,V> {
+    private volatile Map<K, V> map;
+
+    private ReentrantLock lock = new ReentrantLock();
+    public CopyOnWriteMap(){
+        this.init();
+    }
+    private void init(){
+        this.map = new HashMap<>();
+    }
+
+    @Override
+    public int size() {
+        return map.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return map.isEmpty();
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+        return map.containsKey(key);
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+        return map.containsValue(value);
+    }
+
+    @Override
+    public V get(Object key) {
+        return null;
+    }
+
+    @Override
+    public V put(K key, V value) {
+        try {
+            lock.lock();
+            Map<K,V>  newMap = new HashMap<>(map);
+            V val = newMap.put(key, value);
+            this.map = newMap;
+            return  val;
+        }finally {
+           lock.unlock();
+        }
+
+    }
+
+    @Override
+    public V remove(Object key) {
+        try {
+            //加锁
+            lock.lock();
+            // 创建一个新的,然后将原来的map放进行去
+            Map<K,V>  newMap = new HashMap<>(map);
+            V val = newMap.remove(key);
+            this.map = newMap;
+            return  val;
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 也是一个写操作，要加锁
+     * @param m
+     */
+    @Override
+    public void putAll(Map<? extends K, ? extends V> m) {
+        try {
+            //加锁
+            lock.lock();
+            // 创建一个新的,然后将原来的map放进行去
+            Map<K,V>  newMap = new HashMap<>(map);
+            // 将所有的元素放到这个map中去
+            newMap.putAll(m);
+            this.map = newMap;
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public void clear() {
+        try {
+            //加锁
+            lock.lock();
+           map = new HashMap<>();
+        }finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public Set<K> keySet() {
+        return map.keySet();
+    }
+
+    @Override
+    public Collection<V> values() {
+        return map.values();
+    }
+
+    @Override
+    public Set<Entry<K, V>> entrySet() {
+        return map.entrySet();
+    }
+}
+
+```
+43.2 自定义一个MyQueue
+```java
+package com.learn.concurrenty.juc.collections.custom;
+
+/**
+ * @ClassName: MyQueue
+ * @Description:
+ * @Author: lin
+ * @Date: 2020/4/20 17:14
+ * History:
+ * @<version> 1.0
+ */
+public class MyQueue<E> {
+    private static class Node<E>{
+        private E element;
+        private Node<E> next;
+
+        /**
+         * 节点
+         * @param element 元素
+         * @param next  下一个节点
+         */
+        public Node(E element, Node<E> next) {
+            this.element = element;
+            this.next = next;
+        }
+
+        public E getElement() {
+            return element;
+        }
+
+        public void setElement(E element) {
+            this.element = element;
+        }
+
+        public Node<E> getNext() {
+            return next;
+        }
+
+        public void setNext(Node<E> next) {
+            this.next = next;
+        }
+
+        @Override
+        public String toString() {
+            return (element == null) ? "" : element.toString();
+        }
+
+    }
+
+    private Node<E> first, last;
+    private int size;
+
+    public  int size(){
+        return  size;
+    }
+
+    public boolean isEmpty(){
+        return  size == 0;
+    }
+
+    /**
+     * 第一个元素
+     * @return
+     */
+    public E peekFirst(){
+        return  first == null ? null : first.element;
+    }
+
+    /**
+     * 最后一个元素
+     * @return
+     */
+    public E peekLast(){
+        return  last == null ? null : last.getElement();
+    }
+
+    /**
+     * 添加元素
+     * @param element
+     */
+    public void addLast(E element){
+        Node<E> newNode = new Node<>(element, null);
+        if(size() == 0){
+            first = newNode;
+        }else{
+            last.setNext(newNode);
+        }
+        last = newNode;
+        size ++;
+    }
+
+    public E removeFirst(){
+        if(isEmpty()){return  null;}
+        E element = first.getElement();
+        first = first.getNext();
+        size --;
+        if(size() == 0){
+            last = null;
+        }
+        return  element;
+    }
+
+    public static void main(String[] args) {
+        MyQueue<String> myQueue = new MyQueue<>();
+        myQueue.addLast("hello");
+        myQueue.addLast("world");
+        myQueue.addLast("java");
+
+        System.out.println(myQueue.removeFirst());
+        System.out.println(myQueue.removeFirst());
+        System.out.println(myQueue.removeFirst());
+    }
+}
+
+```
+
+
+42. 跳表的技术特点
 ```
 1.一种随机的数据结构
 2.最底层包含整个跳表的所有元素
@@ -6307,8 +12557,5 @@ public class UnsafeFooTest {
 ```
 
 
-45、相关队列比较
-```                        
 
-```
 

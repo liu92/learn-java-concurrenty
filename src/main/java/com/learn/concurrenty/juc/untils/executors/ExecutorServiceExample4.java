@@ -1,11 +1,8 @@
 package com.learn.concurrenty.juc.untils.executors;
 
-import com.learn.concurrenty.DefaultThreadFactory;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 

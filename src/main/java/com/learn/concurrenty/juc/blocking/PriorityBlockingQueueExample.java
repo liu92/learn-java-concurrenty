@@ -1,6 +1,5 @@
 package com.learn.concurrenty.juc.blocking;
 
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /**

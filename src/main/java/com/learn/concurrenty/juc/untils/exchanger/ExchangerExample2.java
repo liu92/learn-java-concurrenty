@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * @ClassName: ExchangerExample1
+ * @ClassName: ExchangerExample2
  * @Description:
  * @Author: lin
  * @Date: 2020/4/10 8:43
