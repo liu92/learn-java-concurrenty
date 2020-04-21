@@ -1,9 +1,7 @@
 package com.learn.concurrenty.chapter6;
 
 import com.learn.concurrenty.DefaultThreadFactory;
-import com.learn.concurrenty.chapter1.TryConcurrent;
 
-import java.lang.annotation.Native;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -66,7 +64,7 @@ public class ThreadInterrupt {
          };
           t.start();
 
-          Thread mainThread = Thread.currentThread();
+        Thread mainThread = Thread.currentThread();
         Thread t2 = new Thread(){
             @Override
             public void run() {
@@ -76,7 +74,8 @@ public class ThreadInterrupt {
                     e.printStackTrace();
                 }
                 // t.interrupt()并没有打断线程。
-                // t.interrupt();
+                // 因为join的是 main线程,所以这个打断应该是当前线程去打断.
+//                 t.interrupt();
                 mainThread.interrupt();
                 System.out.println("interrupt");
             }
@@ -87,13 +86,18 @@ public class ThreadInterrupt {
             //t.join他join的是main线程，而不是当前线程，
             // join的是main线程，打断是t线程 所以不能打断，
             // 那么怎么将当前线程打断喃？ 我们将上面的   t.interrupt();
-            // 改成 mainThread.interrupt(); 这样就可以打断线程了， 所以会进入下面
+            // 改成 mainThread.interrupt(); 这样就可以打断线程了， 所以会进入下面catch
+            // 这里只是给线程设置了一个中断标记, 不做任何其他操作,关于你是否响应此中断,有你自己决定
             t.join();
         } catch (InterruptedException e) {
             e.printStackTrace();
             System.out.println("进入这里。。。。。。。。。");
+
         }
 
+        // 如果响应了中断,这里也会执行
+
+        System.out.println("==========================");
         // 打印结果
 //        interrupt
 //        java.lang.InterruptedException
