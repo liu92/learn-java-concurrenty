@@ -5308,25 +5308,29 @@ public class ContextTest {
 
 28、相关多线程和设计模式
 ```
-1. singleton design pattern
+1. singleton design pattern (单例模式)
 2. WaitSet in synchronzied monitor
-3. Cpu&Cpu cache& Main Memory & Data Bus & Cache Line
-4. The volatile key word in deep
-5. Java Class Loader
-6. Observer to monitor The Thread lifecycle
-7. Single Thread Execution design pattern
-8. Immutable design pattern
-9. Guarded Suspension design pattern
+3. Cpu&Cpu cache& Main Memory & Data Bus & Cache Line (cpu缓存，主内存，数据线，缓存级别)
+4. The volatile key word in deep （volatile 关键字深入理解）
+5. Java Class Loader (类加载)
+6. Observer to monitor The Thread lifecycle (线程生命周期)
+7. Single Thread Execution design pattern (单线程执行模式)
+8. Immutable design pattern (不可变线程设计模式)
+9. Guarded Suspension design pattern : 等待唤醒机制的规范实现 ，直译为保护性暂停
 10.Balking design pattern
-11.Producer-Consumer
-12.Read-Write Lock design pattern
-13.Thread-Per-Message Design Patten
+11.Producer-Consumer (生产---消费)
+12.Read-Write Lock design pattern （读写锁模式）
+13.Thread-Per-Message Design Patten ：这种委托他人办理的方式，在并发编程领域被总结为一种设计模式，叫做 Thread-Per-Message 模式，简言之就是为每个任务分配一个独立的线程。
+这是一种最简单的分工方法，实现起来也非常简单。
+Thread-Per-Message 模式的一个最经典的应用场景是网络编程里服务端的实现，服务端为每个客户端请求创建一个独立的线程，当线程处理完请求后，
+自动销毁，这是一种最简单的并发处理网络请求的方法。
+
 14.Worker Thread Design Pattern
-15.Future Design Pattern
-16.Two-Phase Termination Design Pattern
-17.The Thread-Specific Storage
+15.Future Design Pattern  （Future设计模式）
+16.Two-Phase Termination Design Pattern （两阶段提交）
+17.The Thread-Specific Storage 
 18.Active Objects
-19.Count Down Design Pattern
+19.Count Down Design Pattern 
 20.JMM-java Memory Model
 ```
 
@@ -5524,7 +5528,7 @@ public class Singleton {
 30.3
 ```
 1.方法区 存放了每一个类对象的结构、运行时常量、字段 、方法数据和构造函数代码
-包括用于类和实例初始化以及接口初始化的特殊方法
+包括用于类和实例初始化以及接口初始化的特殊方法。
 而堆里面存放的是类对象的真实数据，这个真实的数据的结构就是存放在堆里
 当我们在访问的时候 通过堆中有个对象类型数据的指针 然后去访问 方法区，
 因为数据有了 但是要组织起来，这个数据的类型是存放在方法区中的 所以 通过 
@@ -5533,38 +5537,38 @@ public class Singleton {
 ```
 30.4 链接阶段
 ```
-.在加载阶段完成后，虚拟机外部的二进制数据量就会按照虚拟机所需要的格式存储在
+1、在加载阶段完成后，虚拟机外部的二进制数据量就会按照虚拟机所需要的格式存储在
 方法区中(数据结构)，然后在堆中创建一个class对象，这个对象作为程序访问方法区中
 这些数据结构的外部接口
-.加载阶段与连接阶段的部分内容可以是交叉进行的，比如一部分代码加载完成就可以进行验证
+2、加载阶段与连接阶段的部分内容可以是交叉进行的，比如一部分代码加载完成就可以进行验证
 提供效率 
 
-验证阶段: 验证住院的目的是确保class文件中的字节流中包含的信息符合虚拟机的要求，
+3、验证阶段: 验证住院的目的是确保class文件中的字节流中包含的信息符合虚拟机的要求，
 并且不会损害到jvm自身的安全
-.VerifyError
-.文件格式验证
+   VerifyError
+3.1、文件格式验证
   .魔术因子是否正确，0xCAFEBABE
   .主从版本号是否符合当前虚拟机
   .常量池中常量类型是不是不支持
   .etc
-. 元数据验证
+3.2、 元数据验证
   . 是否有父类
   . 父类是不是 允许继承
   . 是否实现了抽象方法
   . 是否覆盖了父类的final字段
   . 其他的语义检查
-. 字节码验证
+3.3、 字节码验证
   . 主要进行数据和控制流的分析，不会出现这样的情况，在操作栈中放置一个int类型
     但是却给了一个long行的数据
-. 符合应用验证
+3.4、 符合应用验证
   . 调用了一个不存在方法，字段等等
     符号引用验证的目的是确保解析动作能正常执行，如果无法通过符号引用验证，将会抛出
   一个java.lang.IncompatibleClassChangeError异常的子类，如java.lang.IllegalAccessError,
    java.lang.NosuchFieldError 等
 
-.准备阶段: 就是给类变量分配初始值(就是一些默认值)
+4 准备阶段: 就是给类变量分配初始值(就是一些默认值)
 
-.解析阶段: 
+5、解析阶段: 
    . 类或者接口的解析
    . 字段解析
    . 类方法解析
